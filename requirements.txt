@@ -1,0 +1,11 @@
+jupyter
+pymysql
+pandas
+numpy
+folium
+matplotlib
+pyproj
+scipy
+scikit-learn
+requests
+openpyxl
