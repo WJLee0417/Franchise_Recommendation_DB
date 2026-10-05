@@ -11,7 +11,7 @@
 | 형태 | 대학 데이터베이스 팀 프로젝트 |
 | 핵심 주제 | 상권 데이터 모델링 및 유사 상권 기반 프랜차이즈 추천 |
 | 주요 데이터 | 서울시 상권분석서비스, 공정거래위원회 가맹사업정보 |
-| 실행 환경 | Jupyter Notebook / Python / MySQL |
+| 실행 환경 | Jupyter Notebook / Python / MySQL / Docker Compose |
 
 ```text
 공공·프랜차이즈 데이터 수집
@@ -24,6 +24,8 @@
 → 추천 점수 계산 및 후보 출력
 → Folium 지도 시각화
 ```
+
+공개 저장소에서는 원천 데이터를 재배포하지 않고, 동일한 데이터 구조를 따르는 **합성 Demo Seed와 Docker Compose 환경**을 통해 전체 흐름을 재현할 수 있도록 고도화했습니다.
 
 ## 2. 기획 의도
 
@@ -51,49 +53,52 @@
 ### 유사 상권 탐색
 - 식별자·좌표를 제외한 수치형 특성 사용
 - 결측치 보정
-- 코사인 유사도 기준 상위 상권 탐색
+- 코사인 유사도 기준 유사 상권 탐색
 
 ### 프랜차이즈 추천
 - 유사 상권 업종 매출과 프랜차이즈 정보 결합
 - 당기순이익, 신규개점, 계약해지, 인테리어비, 교육비, 보증금, 기타비용 반영
 - 휴리스틱 추천 점수 기준 정렬
 
-### 지도 시각화
-- EPSG:5181 좌표를 WGS84로 변환
-- Folium 기반 유사 상권 위치 시각화
+### 공개 Demo 실행 환경
+- Docker Compose 기반 MySQL 실행
+- `schema.sql`과 `seed_demo.sql` 자동 초기화
+- 별도 원천 데이터 없이 Demo Target Area 기준 분석 실행
+- 실제 데이터 모드와 Demo 모드 분리
 
 ## 4. 기술 스택
 
 | 영역 | 기술 |
 | --- | --- |
 | Language | Python, SQL |
-| Database | MySQL |
+| Database | MySQL 8 |
 | Data Analysis | Pandas, NumPy |
 | Similarity | scikit-learn cosine_similarity |
 | Visualization | Folium, Matplotlib |
 | Geospatial | pyproj |
 | DB Connection | PyMySQL |
 | Notebook | Jupyter Notebook |
+| Runtime | Docker Compose |
 
 ## 5. 시스템 아키텍처
 
 ```mermaid
 flowchart LR
-    SEOUL["서울시 상권 데이터"]
-    FTC["프랜차이즈 데이터"]
+    RAW["원천 데이터"]
+    DEMO["Synthetic Demo Seed"]
     PREP["전처리 / 업종 코드 정합화"]
+    COMPOSE["Docker Compose"]
     MYSQL[("MySQL")]
-    INPUT["입력 지역 데이터"]
     PY["Python / Pandas"]
     SIM["Cosine Similarity"]
     SQL["SQL JOIN / 추천 점수"]
     MAP["Folium 지도"]
     RESULT["추천 후보"]
 
-    SEOUL --> PREP
-    FTC --> PREP
+    RAW --> PREP
     PREP --> MYSQL
-    INPUT --> PY
+    DEMO --> COMPOSE
+    COMPOSE --> MYSQL
     MYSQL --> PY
     PY --> SIM
     SIM --> SQL
@@ -102,11 +107,14 @@ flowchart LR
     SQL --> RESULT
 ```
 
+공개 저장소의 기본 실행 경로에서는 Docker Compose가 MySQL을 실행하고 `schema.sql`과 `seed_demo.sql`을 순서대로 적용합니다. Notebook은 합성된 `Demo Target Area`를 입력 지역으로 사용해 유사 상권 탐색부터 추천 후보 조회까지 수행합니다.
+
 ## 6. 추천 로직
 
 추천은 **유사 상권 탐색**과 **프랜차이즈 후보 정렬** 두 단계로 구성됩니다.
 
 ### 1단계: 유사 상권 탐색
+
 상권 통합 데이터에서 상권 코드·명칭·좌표·행정구역 코드 등 식별 목적 컬럼을 제외한 특성을 사용합니다.
 
 ```text
@@ -125,17 +133,19 @@ flowchart LR
 | 긍정 요소 | 유사 상권 업종 매출, 당기순이익, 신규개점 |
 | 비용·위험 요소 | 계약해지, 단위면적당 인테리어비, 교육비, 보증금, 기타비용 |
 
-이 점수는 학습 모델의 예측값이 아니라 프로젝트 당시 정의한 규칙 기반 비교 점수입니다.
+이 점수는 학습 모델의 예측값이 아니라 프로젝트 당시 정의한 규칙 기반 비교 점수입니다. Demo Notebook에서는 이 요소를 확인할 수 있도록 단순화한 점수식을 사용합니다.
 
 상세 내용은 [추천 설계](docs/recommendation-design.md)에 정리되어 있습니다.
 
 ## 7. 데이터 수집 및 전처리
 
+원 프로젝트에서 사용한 데이터는 다음 출처를 기반으로 구성했습니다.
+
 - 서울 열린데이터광장: 상권, 매출, 점포, 인구, 소득·소비, 집객시설 등
 - 공정거래위원회 가맹사업정보제공시스템: 프랜차이즈 재무·가맹·비용 지표
 - 입력 지역 사례 데이터: 프로젝트 당시 별도 입력 파일 구성
 
-원천 데이터와 가공 데이터는 재배포 범위를 별도로 확인해야 하므로 저장소에는 포함하지 않습니다.
+원천 데이터와 가공 데이터는 공개 저장소에 포함하지 않습니다. 대신 `sql/seed_demo.sql`에 실제 상권·브랜드와 무관한 합성 데이터를 제공해 저장소만으로 실행 흐름을 검증할 수 있도록 구성했습니다.
 
 ## 8. 데이터 구조
 
@@ -169,13 +179,16 @@ Franchise_Recommendation_DB/
 │  └─ franchise_recommendation.ipynb
 ├─ sql/
 │  ├─ schema.sql
+│  ├─ seed_demo.sql
 │  └─ sample_queries.sql
 ├─ data/
 │  └─ README.md
 ├─ docs/
 │  ├─ data-model.md
 │  ├─ recommendation-design.md
+│  ├─ demo-environment.md
 │  └─ security-review.md
+├─ compose.yaml
 ├─ .env.example
 ├─ .gitignore
 ├─ requirements.txt
@@ -184,65 +197,98 @@ Franchise_Recommendation_DB/
 
 ## 10. 실행 방법
 
-### 1. Python 환경
+공개 저장소는 **Demo 모드가 기본값**입니다.
+
+### 1. MySQL Demo DB 실행
+
+```bash
+docker compose up -d
+docker compose ps
+```
+
+처음 실행할 때 다음 순서로 DB가 초기화됩니다.
+
+```text
+sql/schema.sql
+→ sql/seed_demo.sql
+→ franchise_demo DB 생성
+```
+
+### 2. Python 환경 준비
+
 ```bash
 python -m venv .venv
+```
+
+macOS / Linux:
+
+```bash
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. 환경변수
-`.env.example`을 참고해 DB 접속 정보를 로컬 환경변수로 설정합니다.
+Windows PowerShell:
 
-```text
-FRANCHISE_DB_HOST
-FRANCHISE_DB_PORT
-FRANCHISE_DB_USER
-FRANCHISE_DB_PASSWORD
-FRANCHISE_DB_NAME
+```powershell
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
-### 3. 데이터 준비
-기본 입력 예시는 다음 경로를 사용합니다.
+### 3. Notebook 실행
 
-```text
-data/원천동.xlsx
-```
-
-### 4. DB 스키마
-```bash
-mysql -u <user> -p <database> < sql/schema.sql
-```
-
-### 5. Notebook
 ```bash
 jupyter notebook notebooks/franchise_recommendation.ipynb
 ```
 
+별도 환경변수를 설정하지 않아도 다음 Demo DB 설정을 기본으로 사용합니다.
+
+```text
+host=127.0.0.1
+port=3306
+database=franchise_demo
+user=franchise
+password=franchise
+DATA_MODE=demo
+```
+
+### 4. Demo DB 재초기화
+
+Seed를 변경했다면 MySQL 초기화 스크립트를 다시 적용하기 위해 볼륨을 제거합니다.
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+실제 데이터 환경으로 전환하는 방법은 [Demo 실행 환경](docs/demo-environment.md)을 참고합니다.
+
 ## 11. 검증
 
-- Notebook JSON 구조 및 Python 코드 구문 확인
-- DB credential을 환경변수로 분리
-- 개인 PC 절대경로 제거
-- 출력 셀의 민감정보 제거
+- 공개 Notebook의 JSON 구조와 Python 코드 흐름 정리
+- DB credential 및 개인 PC 절대경로 제거
+- Docker Compose에서 MySQL 스키마와 Demo Seed 자동 초기화
+- Demo Target Area를 후보 상권에서 제외해 자기 자신이 유사 상권으로 선택되는 문제 방지
+- Demo 데이터만으로 유사 상권 → 업종 성과 → 프랜차이즈 후보 조회 흐름 구성
 - DDL의 FK 생성 순서를 참조 테이블 우선으로 정리
-- 유사 상권 탐색 → 지도 → 추천 SQL 순으로 실행 흐름 정리
 
-원천 데이터와 DB 환경이 필요하므로 저장소 자체에는 end-to-end 실행 결과를 포함하지 않습니다.
+Demo Seed는 실행 재현을 위한 합성 데이터이며 원 프로젝트의 분석 결과를 재현하기 위한 데이터가 아닙니다.
 
 ## 12. 현재 범위와 한계
 
 - 원천·가공 데이터는 저장소에 포함하지 않습니다.
+- 공개 Demo 결과는 합성 데이터에 대한 실행 예시이며 실제 상권 분석 결과를 의미하지 않습니다.
 - 유사도 계산 전 특성 표준화를 수행하지 않습니다.
 - 결측치를 0으로 처리합니다.
 - 추천 가중치는 학습값이 아닌 규칙 기반 값입니다.
 - 창업 성공 확률이나 투자수익을 예측하는 모델이 아닙니다.
-- 외부 GeoJSON에 의존하는 지도 시각화는 오프라인에서 동작하지 않을 수 있습니다.
 
 ## 13. 관련 문서
 
 - [데이터 모델](docs/data-model.md)
 - [추천 설계](docs/recommendation-design.md)
+- [Demo 실행 환경](docs/demo-environment.md)
 - [공개본 보안 검토](docs/security-review.md)
 - [입력 데이터 안내](data/README.md)
 - [MySQL 스키마](sql/schema.sql)
+- [Demo Seed](sql/seed_demo.sql)
 - [SQL 예제](sql/sample_queries.sql)
