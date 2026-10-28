@@ -1,6 +1,6 @@
 -- Phase 3-1 correction: measured Seoul opening/closure rates can exceed 100.
--- Source formula: reported opening/closure count / reported total stores * 100.
--- Reference: https://golmok.seoul.go.kr/intendedOwner/intendedOwnerAnalysis.do
+-- The precise official historical rate denominator could not be verified.
+-- Do NOT assume these rates always equal event count / current stores * 100.
 -- Historical 2022Q1-2023Q2 raw STORE CSV: opening >100 (5), closure >100 (124),
 -- distinct offending rows (union): 128 / 457043. Maximum closure rate: 4800.
 -- Preserve original rates, do not clamp or coerce to 0. >100 is a QA anomaly
