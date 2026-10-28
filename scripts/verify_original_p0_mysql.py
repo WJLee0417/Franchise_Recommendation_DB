@@ -8,6 +8,7 @@ No source CSVs, passwords or raw values are uploaded to GitHub.
 import argparse
 import hashlib
 import json
+import time
 import zipfile
 from pathlib import Path
 
@@ -42,8 +43,9 @@ def verify_persisted(kind, archive, member, file_hash, batch_id, expected_count)
     import pymysql
     src = SOURCES[kind]
     columns = [
-        "source_record_path", "source_document_id", "raw_record_text",
-        "reference_period_text", *src.column_map.values(),
+        "collection_batch_id", "source_record_path", "source_document_id", "raw_record_text",
+        "reference_period_text", "source_url", "source_version", "unit_metadata_text",
+        *src.column_map.values(),
     ]
     digest = hashlib.sha256()
     anomalies = {"opening": 0, "closure": 0, "either": 0}
@@ -54,8 +56,8 @@ def verify_persisted(kind, archive, member, file_hash, batch_id, expected_count)
         if actual_count != expected_count:
             raise AssertionError(f"{kind}: {actual_count} persisted, expected {expected_count}")
         sql = (
-            "SELECT " + ", ".join(columns) + f" FROM {src.table} "
-            + "WHERE collection_batch_id=%s ORDER BY source_row_id"
+            "SELECT " + ", ".join(columns) + ", source_row_id, collected_at" + f" FROM {src.table} "
+            + "WHERE collection_batch_id=%s ORDER BY CAST(SUBSTRING(source_record_path, 12) AS UNSIGNED), source_row_id"
         )
         with conn.cursor(pymysql.cursors.SSCursor) as cur:
             cur.execute(sql, (batch_id,))
@@ -65,7 +67,7 @@ def verify_persisted(kind, archive, member, file_hash, batch_id, expected_count)
                 if stored_tuple is None:
                     raise AssertionError(f"{kind}: too few MySQL rows")
                 count += 1
-                stored = dict(zip(columns, stored_tuple))
+                stored = dict(zip(columns, stored_tuple[:len(columns)]))
                 for key in columns:
                     if row[key] != stored[key]:
                         raise AssertionError(f"{kind}: record {count}, field {key} mismatch")
@@ -75,10 +77,8 @@ def verify_persisted(kind, archive, member, file_hash, batch_id, expected_count)
                         raise AssertionError(
                             f"{kind}: record {count}, unmodified original field {source_field} differs"
                         )
-                digest.update(
-                    (stored["source_record_path"] + "\t"
-                     + stored["raw_record_text"] + "\n").encode("utf-8")
-                )
+                digest.update((json.dumps(stored_tuple, ensure_ascii=False, default=str,
+                                          separators=(",", ":")) + "\n").encode("utf-8"))
                 if kind == "store":
                     a, b = float(fields["개업_율"]), float(fields["폐업_률"])
                     anomalies["opening"] += a > 100
@@ -89,7 +89,7 @@ def verify_persisted(kind, archive, member, file_hash, batch_id, expected_count)
     if kind == "store" and anomalies != {"opening": 5, "closure": 124, "either": 128}:
         raise AssertionError(f"Store source above-100 values changed: {anomalies}")
     return {"rows_verified": expected_count, "all_mapped_fields_and_raw_json_match": True,
-            "raw_record_sha256": digest.hexdigest(),
+            "stored_rows_sha256": digest.hexdigest(),
             "rate_anomalies": anomalies if kind == "store" else None}
 
 
@@ -106,27 +106,42 @@ def main():
 
     result = {"verification": "REAL_MYSQL", "source_zip": args.input.name,
               "all_checks_pass": False, "tables": {}}
-    for kind, member in select_members(args.input).items():
+    members = select_members(args.input)
+    # Reject a mixed or modified archive before writing any source to MySQL.
+    for kind, member in members.items():
+        if sha256_source(args.input, member) != SAMPLES[kind][1]:
+            raise RuntimeError(f"{kind}: ZIP member SHA256 differs from audited archive")
+    for kind, member in members.items():
         _, expected_hash, expected_count = SAMPLES[kind]
         digest = sha256_source(args.input, member)
         if digest != expected_hash:
             raise RuntimeError(f"{kind}: ZIP member SHA256 differs from audited archive")
         batch_id = make_batch_id(SOURCES[kind], digest)
+        started = time.monotonic()
         first = ingest_csv(kind=kind, input_path=args.input,
                            zip_member=member, batch_size=args.batch_size)
+        first_seconds = time.monotonic() - started
+        verified_before = verify_persisted(kind, args.input, member, digest, batch_id, expected_count)
+        started = time.monotonic()
         again = ingest_csv(kind=kind, input_path=args.input,
                            zip_member=member, batch_size=args.batch_size)
+        replay_seconds = time.monotonic() - started
         if first["rows_scanned"] != expected_count:
             raise AssertionError(f"{kind}: source count differs")
         if again["rows_inserted"] or again["rows_already_present"] != expected_count:
             raise AssertionError(f"{kind}: rerun should insert zero rows")
         verified = verify_persisted(kind, args.input, member, digest, batch_id, expected_count)
+        if verified != verified_before:
+            raise AssertionError(f"{kind}: persisted rows changed during replay")
         result["tables"][kind] = {
             "source_sha256": digest, "batch_id": batch_id,
             "first_run": {k: first[k] for k in
                           ("rows_scanned", "rows_inserted", "rows_already_present")},
             "second_run": {k: again[k] for k in
                            ("rows_scanned", "rows_inserted", "rows_already_present")},
+            "first_run_seconds": round(first_seconds, 3),
+            "replay_seconds": round(replay_seconds, 3),
+            "rows_unchanged_after_replay": True,
             **verified,
         }
         print(f"PASS {kind}: {expected_count} persisted, rerun inserted 0, raw matches", flush=True)
