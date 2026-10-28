@@ -637,7 +637,6 @@ CREATE TABLE FACT_FRANCHISE_CHANGE (
   KEY ix_ffc_period (period_key),
   CONSTRAINT fk_ffc_period FOREIGN KEY (period_key) REFERENCES DIM_PERIOD(period_key) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT fk_ffc_franchise FOREIGN KEY (franchise_key) REFERENCES DIM_FRANCHISE(franchise_key) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  ,
   CONSTRAINT ck_ffc_lineage CHECK (CHAR_LENGTH(TRIM(lineage_group_id))>0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
