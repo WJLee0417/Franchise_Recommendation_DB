@@ -170,7 +170,7 @@ CREATE TABLE FACT_FRANCHISE_STARTUP_COST (
   loaded_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (disclosure_version_key,franchise_key),
   KEY ix_ffsc_franchise (franchise_key),
-  CONSTRAINT fk_ffsc_version_brand FOREIGN KEY (disclosure_version_key,franchise_key),
+  CONSTRAINT fk_ffsc_version_brand FOREIGN KEY (disclosure_version_key,franchise_key)
   REFERENCES DIM_DISCLOSURE_VERSION(disclosure_version_key,franchise_key) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT ck_ffsc_join CHECK (joining_fee IS NULL OR joining_fee>=0),
   CONSTRAINT ck_ffsc_train CHECK (training_fee IS NULL OR training_fee>=0),
@@ -192,7 +192,7 @@ CREATE TABLE FACT_FRANCHISE_INTERIOR (
   loaded_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (disclosure_version_key,specification_code,franchise_key),
   KEY ix_ffi_franchise (franchise_key),
-  CONSTRAINT fk_ffi_version_brand FOREIGN KEY (disclosure_version_key,franchise_key),
+  CONSTRAINT fk_ffi_version_brand FOREIGN KEY (disclosure_version_key,franchise_key)
   REFERENCES DIM_DISCLOSURE_VERSION(disclosure_version_key,franchise_key) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT ck_ffi_spec CHECK (CHAR_LENGTH(TRIM(specification_code))>0),
   CONSTRAINT ck_ffi_area CHECK (standard_store_area IS NULL OR standard_store_area>0),
