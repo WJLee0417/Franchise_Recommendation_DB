@@ -42,7 +42,7 @@ python -m franchise_dw.ingest_p0_csv --input data/local/archive.zip --source sto
 
 - [x] 실제 보관본 전체 CSV 스트리밍/매핑 dry-run.
 - [x] MySQL 8 합성 데이터 통합 테스트·재실행 검증 스크립트 작성.
-- [ ] GitHub Actions 통합 테스트 성공 결과 확인.
+- [x] **GitHub Actions Run 40676989072 통과:** MySQL 8 실제 합성 데이터 INSERT·재실행 테스트 PASS (원본 ZIP과는 별개).
 - [ ] **실제 원본 ZIP 584,385행의 MySQL 저장 및 중복 재실행·집계 비교**.
 
 원본의 모든 행이 실제 MySQL에 저장되기 전에는 Phase 3-3 실적재 완료라고 주장하지 않는다.
