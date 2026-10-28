@@ -4,7 +4,7 @@
 - DDL: [sql/v2/p0/001_schema.sql](../../sql/v2/p0/001_schema.sql)
 - Smoke/negative 테스트: [sql/v2/p0/tests/001_integrity_smoke.sql](../../sql/v2/p0/tests/001_integrity_smoke.sql)
 - 데이터베이스: `franchise_dw_p0`. 기존 `sql/schema.sql`, `franchise_demo`와 분리.
-- 대상: 원본 ERD의 **P0 11개 물리 테이블, 141개 모델 속성** (SRC 63, DIM 48, FACT 19 = 총 130? 아래 실제 개수 기준 참고). 구현 편의상 `DIM_AREA.current_area_code`, `DIM_INDUSTRY.current_industry_code` 두 STORED 생성 컬럼을 **추가**하여 현재 행 유일성을 DB에서 강제한다.
+- 대상: 원본 ERD의 **P0 11개 물리 테이블, 135개 원본 모델 속성** (SRC 63, DIM 53, FACT 19). 구현 편의상 `DIM_AREA.current_area_code`, `DIM_INDUSTRY.current_industry_code` 두 STORED 생성 컬럼을 **추가**하여 현재 행 유일성을 DB에서 강제한다.
 - 원천 ERD `상권분석ERD(1).damx`의 테이블/컬럼/자료형을 기준으로 하며, NULL/PK/UK/FK/CHECK는 설계 보강이다. 기본 데이터의 실제 의미·관측 시점이 입증되기 전 적재했다고 가정하지 않는다.
 
 ## 1. 테이블
