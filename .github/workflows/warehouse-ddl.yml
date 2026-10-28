@@ -1,4 +1,4 @@
-name: Warehouse DDL integrity (P0 + P1)
+name: Warehouse DDL integrity (P0 + P1 + P2)
 
 on:
   pull_request:
@@ -46,10 +46,16 @@ jobs:
         run: |
           mysql -h 127.0.0.1 -P 3306 -uroot --default-character-set=utf8mb4 < sql/v2/p1/002_schema.sql
           mysql -h 127.0.0.1 -P 3306 -uroot --default-character-set=utf8mb4 < sql/v2/p1/tests/002_integrity_smoke.sql
-      - name: Assert 38 P0+P1 tables
+      - name: P2 schema + integrity smoke
+        env:
+          MYSQL_PWD: test_root_only
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -uroot --default-character-set=utf8mb4 < sql/v2/p2/003_schema.sql
+          mysql -h 127.0.0.1 -P 3306 -uroot --default-character-set=utf8mb4 < sql/v2/p2/tests/003_integrity_smoke.sql
+      - name: Assert 49 P0+P1+P2 tables
         env:
           MYSQL_PWD: test_root_only
         run: |
           count="$(mysql -h 127.0.0.1 -P 3306 -uroot -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='franchise_dw_p0' AND table_type='BASE TABLE'")"
           echo "table count: $count"
-          test "$count" = "38"
+          test "$count" = "49"
