@@ -39,6 +39,7 @@ jobs:
           MYSQL_PWD: test_root_only
         run: |
           mysql -h 127.0.0.1 -P 3306 -uroot --default-character-set=utf8mb4 < sql/v2/p0/001_schema.sql
+          mysql -h 127.0.0.1 -P 3306 -uroot --default-character-set=utf8mb4 < sql/v2/migrations/004_store_rate_nonnegative.sql
           mysql -h 127.0.0.1 -P 3306 -uroot --default-character-set=utf8mb4 < sql/v2/p0/tests/001_integrity_smoke.sql
       - name: P1 schema + integrity smoke
         env:
