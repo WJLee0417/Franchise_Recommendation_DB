@@ -1,0 +1,57 @@
+name: P0 CSV MySQL integration
+on:
+  pull_request:
+    paths:
+      - 'src/franchise_dw/**'
+      - 'tests/integration_p0_csv_mysql.py'
+      - '.github/workflows/p0-csv-mysql-integration.yml'
+      - 'sql/v2/**'
+  push:
+    branches: [main, feature/phase3-data-source-spec]
+    paths:
+      - 'src/franchise_dw/**'
+      - 'tests/integration_p0_csv_mysql.py'
+      - '.github/workflows/p0-csv-mysql-integration.yml'
+  workflow_dispatch:
+jobs:
+  mysql-csv-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test_root_only
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptest_root_only"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      FRANCHISE_DW_HOST: 127.0.0.1
+      FRANCHISE_DW_PORT: '3306'
+      FRANCHISE_DW_NAME: franchise_dw_p0
+      FRANCHISE_DW_USER: root
+      FRANCHISE_DW_PASSWORD: test_root_only
+      PYTHONPATH: src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Setup MySQL CLI and PyMySQL
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y default-mysql-client
+          python -m pip install pymysql
+      - name: Create full P0/P1/P2 warehouse schema
+        env:
+          MYSQL_PWD: test_root_only
+        run: |
+          mysql -h 127.0.0.1 -uroot < sql/v2/p0/001_schema.sql
+          mysql -h 127.0.0.1 -uroot < sql/v2/migrations/004_store_rate_nonnegative.sql
+          mysql -h 127.0.0.1 -uroot < sql/v2/p1/002_schema.sql
+          mysql -h 127.0.0.1 -uroot < sql/v2/p2/003_schema.sql
+      - name: Execute actual MySQL integration and deterministic replay
+        run: python tests/integration_p0_csv_mysql.py
