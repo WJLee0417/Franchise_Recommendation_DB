@@ -1,0 +1,132 @@
+{
+  "version": "0.1.0",
+  "scope": "2022Q1-2023Q2 archived Seoul P0; decisions at SRC->validated-staging boundary, no DIM/FACT loading",
+  "source_basis": "Full 584385 row profile in docs/v2/phase3-4-p0-quality-profile.md",
+  "general": {
+    "raw_retention": "NEVER modify/delete SRC raw strings or source JSON",
+    "number_cast": "Decimal; reject malformed or nonfinite; integer counts must be integral; preserve strings at SRC",
+    "period": "accept only ^(19|20)[0-9]{2}[1-4]$, convert to YYYYQq only in validated output",
+    "missing": "NULL remains unknown, never fill zero by default",
+    "dedup": "source hash + key + publication version; within-file duplicate business keys quarantine",
+    "source_tracking": "record batch and source path per validated/rejected row"
+  },
+  "rules": [
+    {
+      "id": "P0-DQ-001",
+      "severity": "BLOCK",
+      "scope": "all",
+      "condition": "missing business key, duplicate (key within version), malformed row count, unexpected CSV header, invalid period code",
+      "action": "quarantine row/batch; preserve raw"
+    },
+    {
+      "id": "P0-DQ-002",
+      "severity": "BLOCK",
+      "scope": "metrics",
+      "condition": "nonnumeric required metric, negative strictly nonnegative KPI, or fractional integer count",
+      "action": "quarantine fact-candidate, retain SRC"
+    },
+    {
+      "id": "P0-DQ-003",
+      "severity": "WARN",
+      "scope": "store",
+      "condition": "opening_rate or closure_rate >100",
+      "evidence": {
+        "opening": 5,
+        "closure": 124,
+        "union": 128
+      },
+      "action": "retain original values; flag; do not cap or delete"
+    },
+    {
+      "id": "P0-DQ-004",
+      "severity": "WARN",
+      "scope": "store",
+      "condition": "similar_industry_store_count > store_count",
+      "evidence": {
+        "rows": 70337
+      },
+      "action": "retain; counts have potentially different population definitions; no automatic correction"
+    },
+    {
+      "id": "P0-DQ-005",
+      "severity": "REVIEW",
+      "scope": "store",
+      "condition": "franchise_store_count > store_count",
+      "evidence": {
+        "rows": 20323
+      },
+      "action": "retain in SRC; verify definitions/business dimensions before enforcing hierarchy in FACT"
+    },
+    {
+      "id": "P0-DQ-006",
+      "severity": "REVIEW",
+      "scope": "store",
+      "condition": "store_count=0, events occur; event count exceeds snapshot count; zero rate but positive events",
+      "action": "report; do not alter rates or counts; validate snapshot and aggregation periods"
+    },
+    {
+      "id": "P0-DQ-007",
+      "severity": "WARN",
+      "scope": "sales",
+      "condition": "sex/age detail total differs from overall sales",
+      "action": "retain full amount; do not overwrite amount with demographic sum (company vs individual transactions may differ)"
+    },
+    {
+      "id": "P0-DQ-008",
+      "severity": "REVIEW",
+      "scope": "sales",
+      "condition": "time-of-day transaction count sum differs from total, or negative time-bin transaction count",
+      "evidence": {
+        "negative_timebin_rows": 2,
+        "timebin_sum_mismatch": 4
+      },
+      "action": "exclude invalid breakdown from granular analytics until official source correction; base aggregate can remain eligible"
+    },
+    {
+      "id": "P0-DQ-009",
+      "severity": "BLOCK_FOR_DIM",
+      "scope": "area",
+      "condition": "no officially verified area effective start date/spatial boundary version",
+      "action": "SRC validated only; no DIM_AREA generated dates; no FACT area_key inference"
+    },
+    {
+      "id": "P0-DQ-010",
+      "severity": "WARN",
+      "scope": "sales_store_join",
+      "condition": "STORE has no matching SALES grain",
+      "evidence": {
+        "store_only_business_keys": 331351
+      },
+      "action": "LEFT JOIN store->sales; sales NULL, never treat as 0 or drop store rows"
+    },
+    {
+      "id": "P0-DQ-011",
+      "severity": "BLOCK_FOR_FACT",
+      "scope": "sales",
+      "condition": "unvalidated source period/measurement unit/version",
+      "action": "original 당월_매출_금액 interpreted as quarterly estimated KRW for audited OA-15572 only; no /3 or *3; require area SCD provenance before FACT"
+    },
+    {
+      "id": "P0-DQ-012",
+      "severity": "WARN",
+      "scope": "cross_source",
+      "condition": "same area code has inconsistent name/type",
+      "action": "join only on verified code and spatial version; preserve raw name; no automatic name replacements"
+    },
+    {
+      "id": "P0-DQ-013",
+      "severity": "WARN",
+      "scope": "sales",
+      "condition": "decomposed amount by weekday/weekend, day, time should reconcile to total",
+      "action": "when mismatch flag input; avoid overwriting total; investigate source release and rounding"
+    },
+    {
+      "id": "P0-DQ-014",
+      "severity": "BLOCK_FOR_DIM",
+      "scope": "industry",
+      "condition": "FTC and Seoul industry codes not mapped with versioned crosswalk",
+      "action": "P0 DIM_INDUSTRY may use Seoul taxonomy; FTC mapping held"
+    }
+  ],
+  "status": "APPROVED_POLICY_FOR_IMPLEMENTATION_NOT_APPLIED_TO_DATA"
+}
