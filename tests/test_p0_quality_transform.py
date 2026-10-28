@@ -18,7 +18,7 @@ class P0QualityTests(unittest.TestCase):
                 decimal_value(bad,integer=True)
         r=evaluate("sales",test_row(estimated_sales_amount="100"))
         self.assertEqual(r["normalized_period_code"],"2022Q1")
-        self.assertEqual(r["decision"],"REVIEW") # historical tiny fixture lacks detail
+        self.assertEqual(r["decision"],"ACCEPT") # no invalid detailed metrics supplied
         self.assertEqual(r["normalized_metrics"]["estimated_sales_amount"],100)
     def test_store_warning_rates_are_preserved(self):
         r=evaluate("store",test_row(store_count="5",similar_industry_store_count="5",
