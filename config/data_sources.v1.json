@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "as_of": "2026-10-28",
   "purpose": "Phase 3-1 discovery and conservative ingestion contract; not a verified API adapter",
   "governance": {
@@ -20,6 +20,12 @@
       "Synthetic FTC dataset 15165160 is NOT suitable for real brands/actual monetary amounts",
       "Seoul small-area income and consumption should not be treated as actively updated",
       "FTC industry categories not equal to Seoul service category without crosswalk"
+    ],
+    "archived_p0_sample": "VERIFIED_LOCAL_ARCHIVE_ONLY; not current official portal data",
+    "p0_archive_blockers": [
+      "SRC_SEOUL_STORE historic opening/closure rates above 100 conflict with P0 CHECK",
+      "SRC_SEOUL_AREA lacks source effective date/version",
+      "SRC_SEOUL_SALES monthly amount semantics not validated against official codebook"
     ]
   },
   "sources": [
@@ -33,8 +39,20 @@
       "metadata_refresh": "비정기",
       "grain_candidate": "상권 × 공간정의버전 후보",
       "source_identity_candidate": "상권_코드 + geometry/source version",
-      "status": "VERIFIED_DATASET",
-      "notes": "EPSG:5181; 2024년 공간 표준단위구역 변경 대응 시점/도형 버전 필수."
+      "status": "VERIFIED_ARCHIVED_CSV_SAMPLE",
+      "notes": "EPSG:5181; 2024년 공간 표준단위구역 변경 대응 시점/도형 버전 필수. 2023 ZIP 원본 CSV 검증완료(현재 API 스키마 동일성은 미확인).",
+      "archived_csv_sample": {
+        "file": "서울시 상권분석서비스(영역-상권).csv",
+        "encoding": "cp949",
+        "columns": 11,
+        "rows": 1650,
+        "period_span": "undated",
+        "natural_key": [
+          "상권_코드"
+        ],
+        "duplicates": 0,
+        "sha256": "b6281497b242d25569dcf61cc8bd05e80d300101eea5079577e42d0d280bf137"
+      }
     },
     {
       "target_table": "SRC_SEOUL_SALES",
@@ -46,8 +64,23 @@
       "metadata_refresh": "분기별",
       "grain_candidate": "기준_년분기_코드 × 상권_코드 × 서비스_업종_코드 후보",
       "source_identity_candidate": "기준_년분기_코드 + 상권_코드 + 서비스_업종_코드 + source revision",
-      "status": "VERIFIED_DATASET",
-      "notes": "금액 단위 원; 2026-07-03 공지 이후 공개 범위 2021년 이후. card-based ESTIMATED sales, actual not guaranteed."
+      "status": "VERIFIED_ARCHIVED_CSV_SAMPLE",
+      "notes": "금액 단위 원; 2026-07-03 공지 이후 공개 범위 2021년 이후. card-based ESTIMATED sales, actual not guaranteed. 2023 ZIP 원본 CSV 검증완료(현재 API 스키마 동일성은 미확인).",
+      "archived_csv_sample": {
+        "file": "서울시 상권분석서비스(추정매출-상권).csv",
+        "encoding": "cp949",
+        "columns": 55,
+        "rows": 125692,
+        "period_span": "2022Q1~2023Q2",
+        "natural_key": [
+          "기준_년분기_코드",
+          "상권_코드",
+          "서비스_업종_코드"
+        ],
+        "duplicates": 0,
+        "sha256": "ac2ba3a8f74ec3ccbcb0ca87ba0a9cdb7b1c4cbe21d1f17331d12fa644db786d",
+        "unstructured_source_columns": 47
+      }
     },
     {
       "target_table": "SRC_SEOUL_STORE",
@@ -59,8 +92,26 @@
       "metadata_refresh": "포털 메타데이터 년간/원자료 기준_년분기_코드 포함",
       "grain_candidate": "기준_년분기_코드 × 상권_코드 × 서비스_업종_코드 후보",
       "source_identity_candidate": "기준_년분기_코드 + 상권_코드 + 서비스_업종_코드 + source revision",
-      "status": "VERIFIED_DATASET",
-      "notes": "전체_점포_수 = 일반_점포_수 + 프랜차이즈_점포_수; 갱신 표기 연간과 분기 키 불일치 주의."
+      "status": "VERIFIED_ARCHIVED_CSV_SAMPLE",
+      "notes": "전체_점포_수 = 일반_점포_수 + 프랜차이즈_점포_수; 갱신 표기 연간과 분기 키 불일치 주의. 2023 ZIP 원본 CSV 검증완료(현재 API 스키마 동일성은 미확인).",
+      "archived_csv_sample": {
+        "file": "서울시 상권분석서비스(점포-상권).csv",
+        "encoding": "cp949",
+        "columns": 14,
+        "rows": 457043,
+        "period_span": "2022Q1~2023Q2",
+        "natural_key": [
+          "기준_년분기_코드",
+          "상권_코드",
+          "서비스_업종_코드"
+        ],
+        "duplicates": 0,
+        "sha256": "8f6932112d355554a290b01ca67cd697474107fc6ad478a23b499a742cc98561",
+        "rate_values_exceeding_100": {
+          "개업_율": 5,
+          "폐업_률": 124
+        }
+      }
     },
     {
       "target_table": "SRC_SEOUL_FACILITY",
