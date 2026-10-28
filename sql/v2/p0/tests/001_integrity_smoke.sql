@@ -184,12 +184,16 @@ BEGIN
     DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN
       GET DIAGNOSTICS CONDITION 1 caught_error = MYSQL_ERRNO;
     END;
-    UPDATE FACT_AREA_STORE SET opening_rate = 120.0
+    UPDATE FACT_AREA_STORE SET opening_rate = -1.0
     WHERE period_key = period_id AND area_key = area_id AND industry_key = industry_id;
   END;
   IF caught_error <> 3819 THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'rate range CHECK not enforced';
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'negative opening-rate CHECK not enforced';
   END IF;
+
+  -- Rates over 100 are valid in archive and must not be rejected.
+  UPDATE FACT_AREA_STORE SET opening_rate = 200.0, closure_rate = 4800.0
+  WHERE period_key = period_id AND area_key = area_id AND industry_key = industry_id;
 
   SET caught_error = 0;
   BEGIN
