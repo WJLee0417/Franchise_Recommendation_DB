@@ -1,5 +1,6 @@
 -- P1 integrity smoke. Run after 001_schema.sql and 002_schema.sql on a fresh disposable DB.
--- Transaction rollback protects persistent records. Session temporary proc removed afterward.
+-- Transaction rollback protects persistent records. Procedure is removed after execution.
+-- Negative tests verify exact MySQL errno: 1062 duplicate, 1452 FK, 3819 CHECK.
 USE franchise_dw_p0;
 DELIMITER $$
 CREATE PROCEDURE p1_integrity_smoke()
@@ -64,41 +65,53 @@ BEGIN
  WHERE fr.brand_management_no='BRAND-P1' AND fs.period_key=v_period;
  IF v_count<>1 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='P1 franchise chain JOIN failed'; END IF;
  SET v_err=0;
- BEGIN DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET v_err=1;
+ BEGIN DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN
+      GET DIAGNOSTICS CONDITION 1 v_err = MYSQL_ERRNO;
+    END;
  INSERT INTO DIM_HEADQUARTER(headquarter_management_no,version_no,company_name,effective_start_date,is_current,lineage_group_id)
  VALUES('HQ-P1',2,'Duplicate Current','2026-01-01','Y','p1-test');
  END;
- IF v_err<>1 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='P1 HQ current uniqueness failed'; END IF;
+ IF v_err <> 1062 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='P1 HQ current uniqueness failed'; END IF;
  SET v_err=0;
- BEGIN DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET v_err=1;
+ BEGIN DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN
+      GET DIAGNOSTICS CONDITION 1 v_err = MYSQL_ERRNO;
+    END;
  INSERT INTO DIM_FRANCHISE(brand_management_no,version_no,brand_name,headquarter_key,effective_start_date,is_current,lineage_group_id)
  VALUES('ORPHAN-P1',1,'No HQ',99999999999,'2025-01-01','Y','p1-test');
  END;
- IF v_err<>1 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='P1 orphan franchise FK failed'; END IF;
+ IF v_err <> 1452 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='P1 orphan franchise FK failed'; END IF;
  SET v_err=0;
- BEGIN DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET v_err=1;
+ BEGIN DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN
+      GET DIAGNOSTICS CONDITION 1 v_err = MYSQL_ERRNO;
+    END;
  INSERT INTO DIM_DISCLOSURE_VERSION(disclosure_no,disclosure_version_code,franchise_key,initial_contract_period,initial_contract_unit_code,lineage_group_id)
  VALUES('D-BAD','V1',v_franchise,3,NULL,'p1-test');
  END;
- IF v_err<>1 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='P1 contract unit CHECK failed'; END IF;
+ IF v_err <> 3819 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='P1 contract unit CHECK failed'; END IF;
  SET v_err=0;
- BEGIN DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET v_err=1;
+ BEGIN DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN
+      GET DIAGNOSTICS CONDITION 1 v_err = MYSQL_ERRNO;
+    END;
  INSERT INTO FACT_FRANCHISE_STORE(franchise_key,period_key,region_key,franchise_store_count,lineage_group_id)
  VALUES(v_franchise,v_period,v_region,100,'p1-test');
  END;
- IF v_err<>1 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='P1 franchise FACT grain uniqueness failed'; END IF;
+ IF v_err <> 1062 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='P1 franchise FACT grain uniqueness failed'; END IF;
  SET v_err=0;
- BEGIN DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET v_err=1;
+ BEGIN DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN
+      GET DIAGNOSTICS CONDITION 1 v_err = MYSQL_ERRNO;
+    END;
  UPDATE FACT_FRANCHISE_AVG_SALES SET average_sales_amount=-1
  WHERE franchise_key=v_franchise AND period_key=v_period AND region_key=v_region;
  END;
- IF v_err<>1 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='P1 negative avg sales CHECK failed'; END IF;
+ IF v_err <> 3819 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='P1 negative avg sales CHECK failed'; END IF;
  SET v_err=0;
- BEGIN DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET v_err=1;
+ BEGIN DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN
+      GET DIAGNOSTICS CONDITION 1 v_err = MYSQL_ERRNO;
+    END;
  INSERT INTO SRC_FTC_DISCLOSURE(collection_batch_id,source_document_id,source_record_path,raw_record_text)
  VALUES('p1-batch','p1-doc','/1','{}');
  END;
- IF v_err<>1 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='P1 raw source UNIQUE failed'; END IF;
+ IF v_err <> 1062 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='P1 raw source UNIQUE failed'; END IF;
  ROLLBACK;
  SELECT 'PASS P1: FK, UNIQUE, CHECK, finance negatives and SRC lineage' AS result;
 END$$
