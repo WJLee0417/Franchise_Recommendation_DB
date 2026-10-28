@@ -1,5 +1,5 @@
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "as_of": "2026-10-28",
   "purpose": "Phase 3-1 discovery and conservative ingestion contract; not a verified API adapter",
   "governance": {
@@ -23,9 +23,9 @@
     ],
     "archived_p0_sample": "VERIFIED_LOCAL_ARCHIVE_ONLY; not current official portal data",
     "p0_archive_blockers": [
-      "SRC_SEOUL_STORE historic opening/closure rates above 100 conflict with P0 CHECK",
-      "SRC_SEOUL_AREA lacks source effective date/version",
-      "SRC_SEOUL_SALES monthly amount semantics not validated against official codebook"
+      "Store rates >100: RESOLVED by sql/v2/migrations/004_store_rate_nonnegative.sql; official precise denominator not yet verified",
+      "AREA effective date and geometry version: HOLD DIM_AREA until official version/valid-time evidence",
+      "SALES monthly-vs-quarterly: official Seoul dataset FAQ describes quarterly totals in KRW; do not auto divide/multiply by 3"
     ]
   },
   "sources": [
@@ -52,7 +52,8 @@
         ],
         "duplicates": 0,
         "sha256": "b6281497b242d25569dcf61cc8bd05e80d300101eea5079577e42d0d280bf137"
-      }
+      },
+      "area_scd_policy": "SRC allowed; DIM_AREA blocked until official effective_start_date + spatial boundary version verified"
     },
     {
       "target_table": "SRC_SEOUL_SALES",
@@ -80,7 +81,9 @@
         "duplicates": 0,
         "sha256": "ac2ba3a8f74ec3ccbcb0ca87ba0a9cdb7b1c4cbe21d1f17331d12fa644db786d",
         "unstructured_source_columns": 47
-      }
+      },
+      "sales_amount_semantics": "Quarterly estimated sales, KRW, inferred from official OA-15572 FAQ despite THSMON_SELNG_AMT raw label; no multiplication/division by 3",
+      "sales_source_reference": "https://data.seoul.go.kr/dataList/datasetView.do?currentPageNo=1&infId=OA-15572&serviceKind=1&srvType=A"
     },
     {
       "target_table": "SRC_SEOUL_STORE",
@@ -111,7 +114,9 @@
           "개업_율": 5,
           "폐업_률": 124
         }
-      }
+      },
+      "rate_policy": "Non-negative only; preserve >100 reported values, check anomaly separately",
+      "rate_policy_reference": "docs/v2/phase3-1-p0-blocker-resolution.md"
     },
     {
       "target_table": "SRC_SEOUL_FACILITY",
