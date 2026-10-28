@@ -1,6 +1,6 @@
 -- Execute AFTER 001_schema.sql against a disposable P0 schema.
 -- All fixture inserts are wrapped in a transaction and rolled back.
--- Expected constraint failures must be observed; they do not indicate test failure.
+-- Expected constraint failures must match MySQL error numbers (1062 duplicate, 1452 FK, 3819 CHECK, 1048 NOT NULL).
 USE franchise_dw_p0;
 
 DELIMITER $$
@@ -114,78 +114,92 @@ BEGIN
   -- The same source row in the same batch/document/path must fail.
   SET caught_error = 0;
   BEGIN
-    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET caught_error = 1;
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN
+      GET DIAGNOSTICS CONDITION 1 caught_error = MYSQL_ERRNO;
+    END;
     INSERT INTO SRC_SEOUL_AREA
       (collection_batch_id, source_document_id, source_record_path, raw_record_text)
     VALUES ('p0-test-batch-1', 'area-demo', '/records/1', '{}');
   END;
-  IF caught_error <> 1 THEN
+  IF caught_error <> 1062 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'source duplicate uniqueness not enforced';
   END IF;
 
   -- Exactly one current area version per business code.
   SET caught_error = 0;
   BEGIN
-    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET caught_error = 1;
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN
+      GET DIAGNOSTICS CONDITION 1 caught_error = MYSQL_ERRNO;
+    END;
     INSERT INTO DIM_AREA
       (area_code, version_no, area_name, area_type_key, district_key, dong_key,
        effective_start_date, is_current, lineage_group_id)
     VALUES ('p0-demo', 2, 'Duplicate Current', area_type_id, district_id, dong_id,
             '2026-01-01', 'Y', 'p0-test-batch-1');
   END;
-  IF caught_error <> 1 THEN
+  IF caught_error <> 1062 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'current area uniqueness not enforced';
   END IF;
 
   SET caught_error = 0;
   BEGIN
-    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET caught_error = 1;
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN
+      GET DIAGNOSTICS CONDITION 1 caught_error = MYSQL_ERRNO;
+    END;
     INSERT INTO FACT_AREA_SALES
       (period_key, area_key, industry_key, estimated_sales_amount, lineage_group_id)
     VALUES (period_id, area_id, industry_id, 999, 'p0-test-batch-1');
   END;
-  IF caught_error <> 1 THEN
+  IF caught_error <> 1062 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'sales fact grain uniqueness not enforced';
   END IF;
 
   SET caught_error = 0;
   BEGIN
-    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET caught_error = 1;
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN
+      GET DIAGNOSTICS CONDITION 1 caught_error = MYSQL_ERRNO;
+    END;
     INSERT INTO FACT_AREA_SALES
       (period_key, area_key, industry_key, estimated_sales_amount, lineage_group_id)
     VALUES (period_id, area_id, 999999999999, 999, 'p0-test-batch-1');
   END;
-  IF caught_error <> 1 THEN
+  IF caught_error <> 1452 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'fact industry FK not enforced';
   END IF;
 
   SET caught_error = 0;
   BEGIN
-    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET caught_error = 1;
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN
+      GET DIAGNOSTICS CONDITION 1 caught_error = MYSQL_ERRNO;
+    END;
     UPDATE FACT_AREA_SALES SET estimated_sales_amount = -1
     WHERE period_key = period_id AND area_key = area_id AND industry_key = industry_id;
   END;
-  IF caught_error <> 1 THEN
+  IF caught_error <> 3819 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'negative sales CHECK not enforced';
   END IF;
 
   SET caught_error = 0;
   BEGIN
-    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET caught_error = 1;
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN
+      GET DIAGNOSTICS CONDITION 1 caught_error = MYSQL_ERRNO;
+    END;
     UPDATE FACT_AREA_STORE SET opening_rate = 120.0
     WHERE period_key = period_id AND area_key = area_id AND industry_key = industry_id;
   END;
-  IF caught_error <> 1 THEN
+  IF caught_error <> 3819 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'rate range CHECK not enforced';
   END IF;
 
   SET caught_error = 0;
   BEGIN
-    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET caught_error = 1;
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN
+      GET DIAGNOSTICS CONDITION 1 caught_error = MYSQL_ERRNO;
+    END;
     UPDATE FACT_AREA_STORE SET observation_period_key = NULL
     WHERE period_key = period_id AND area_key = area_id AND industry_key = industry_id;
   END;
-  IF caught_error <> 1 THEN
+  IF caught_error <> 1048 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'observation period NOT NULL not enforced';
   END IF;
 
