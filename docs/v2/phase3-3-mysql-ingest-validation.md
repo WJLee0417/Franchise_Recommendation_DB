@@ -1,48 +1,43 @@
-# Phase 3-3 — 원본 P0 데이터 MySQL 적재 통합 검증
+# Phase 3-3 — 실제 원본 P0 데이터 MySQL 적재 검증
 
-## 검증 범위와 주의사항
+## 결과와 환경
 
-- 사용자 업로드 ZIP 세 CSV의 전체 584,385행에 대해 실제 Python parser dry-run 완료. **MySQL 적재는 미실시**.
-- 현재 로컬 환경에 MySQL 서버·Docker 엔진이 없으며 공개 네트워크 접속도 제한되어 원본 ZIP을 실제 MySQL로 적재할 수 없었다.
-- GitHub Actions의 MySQL 8 통합 검증은 공개 가능한 **합성 데이터 9행**을 대상으로 수행하도록 구성했다. 원본 ZIP은 GitHub에 업로드하지 않았다.
+2026-10-28 실제 원본 584,385행의 MySQL 적재, 재실행 및 전수 비교를 완료했다. 원본 검증과 아래의 합성 데이터 회귀 테스트는 별개다. Phase 3-4 정제·표준화 및 DIM·FACT 적재는 수행하지 않았다.
 
-## 실제 업로드 ZIP dry-run 증거
+- MySQL Community Server **8.0.46**, Docker Desktop 4.83.0, `mysql:8.0` 이미지, 독립 컨테이너 `franchise-phase3-original-mysql`, 로컬 전용 포트 13316, 스키마 `franchise_dw_p0`.
+- 비어 있는 스키마에 P0 → `004_store_rate_nonnegative.sql` → P1 → P2 적용. **49개 테이블** 및 두 비율 CHECK가 0 이상인지 확인했다. 기존 `franchise_demo`는 사용하지 않았다.
+- Python 3.12.14, PyMySQL 1.2.3, `utf8mb4`, CP949 입력, 배치당 1,000행. Python 연결과 배치 트랜잭션을 사용했다.
+- 전달된 실제 ZIP 파일명은 `2023_Franchise_Recommendation_DB.zip`이다. 요청에 기재된 `(6)` 파일명과 다르지만, `/1/` 내부 세 CSV의 SHA-256이 기존 감사 문서와 **모두 일치**한다. 따라서 이 파일을 동일 원본으로 식별했다. ZIP SHA-256: `6d0af15f8117a2dfac631329c1b97cbaed50757453c347ed69caed5962eca0e2`.
+- ZIP·CSV·DB 암호 및 상세 결과 파일은 Git에 포함하지 않았다. 실행 환경의 결과 JSON은 `data/local/p0_original_mysql_result.json`에 남겼다.
 
-| 소스 | 원본 바이트 | SHA-256 | 처리행 | 실제 DB 적재 |
-| --- | ---: | --- | ---: | --- |
-| area | 175,854 | b6281497b242d25569dcf61cc8bd05e80d300101eea5079577e42d0d280bf137 | 1,650 | 미실시 |
-| sales | 58,284,507 | ac2ba3a8f74ec3ccbcb0ca87ba0a9cdb7b1c4cbe21d1f17331d12fa644db786d | 125,692 | 미실시 |
-| store | 46,086,868 | 8f6932112d355554a290b01ca67cd697474107fc6ad478a23b499a742cc98561 | 457,043 | 미실시 |
-| **합계** | | | **584,385** | **미실시** |
+## 실제 원본 적재 및 재실행
 
-동일 보관본의 ZIP 내부 기본데이터 중복 사본은 이중 수집하지 않는다.
+시간은 파일 해시 계산을 포함한 `ingest_csv` 호출의 경과 시간이며, 별도 전수 비교 시간은 포함하지 않는다. 동일한 내용의 중복 ZIP 항목은 수집하지 않았다.
 
-## 실제 MySQL 통합 테스트
+| 테이블 | CSV SHA-256 | 배치 ID | 최초 INSERT | 재실행 INSERT | 최초 적재 초 | 재실행 초 |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| SRC_SEOUL_AREA | `b6281497b242d25569dcf61cc8bd05e80d300101eea5079577e42d0d280bf137` | `p0-4dd5c697615606676fc0235b9c43` | 1,650 | 0 | 0.906 | 0.360 |
+| SRC_SEOUL_SALES | `ac2ba3a8f74ec3ccbcb0ca87ba0a9cdb7b1c4cbe21d1f17331d12fa644db786d` | `p0-e0c1f62afc9bd322c42e525e5345` | 125,692 | 0 | 69.265 | 65.453 |
+| SRC_SEOUL_STORE | `8f6932112d355554a290b01ca67cd697474107fc6ad478a23b499a742cc98561` | `p0-271600360236b23608faf2ae6fdf` | 457,043 | 0 | 105.375 | 107.735 |
+| **합계** | | | **584,385** | **0** | **175.546** | **173.548** |
 
-- `tests/integration_p0_csv_mysql.py`: synthetic CSV 각 소스 3행 생성. P0 SRC에 2행 INSERT → 다시 3행 입력 시 1행만 추가 → 3행 전체 재실행 시 0행 INSERT 및 3행 중복 건너뛰기.
-- 원본 한글 상권명, 추정매출 문자열, 개업률 200/폐업률 4800, 원본 JSON 보존을 조회하여 확인.
-- `DIM_AREA`, `DIM_INDUSTRY`, `FACT_AREA_SALES`, `FACT_AREA_STORE`는 수집기가 수정하지 않음을 별도 검사.
-- CI: `.github/workflows/p0-csv-mysql-integration.yml` (MySQL 8.0 서비스, P0→rate migration→P1→P2 후 검사).
+세 배치 각각 원본 행 수와 저장 행 수, 고유 `source_record_path` 수가 일치했고 각 배치의 문서 ID는 하나였다. 합성 테스트 데이터도 같은 독립 스키마에 있으므로 전체 테이블 행 수가 아닌 위 원본 배치별 집계를 사용했다.
 
-## 원본 데이터 실적재 검증 절차 (추후)
+## 전수 정합성 및 멱등성
 
-환경변수 `FRANCHISE_DW_HOST`, `FRANCHISE_DW_PORT`, `FRANCHISE_DW_NAME`, `FRANCHISE_DW_USER`, `FRANCHISE_DW_PASSWORD`를 설정하고, 원본 ZIP을 `data/local/`에 보관한다. API 키/DB 비밀번호를 Git에 올리지 않는다.
+`scripts/verify_original_p0_mysql.py`로 각 CSV 행과 MySQL 행을 재실행 전후 각각 전수 비교했다. 원본 JSON 전체와 모든 매핑 컬럼, 배치·문서 ID, 레코드 경로, 기준 기간, 출처 메타데이터를 비교했으며 한글 명칭·선행 0·매출 금액·점포 수·개업/폐업 수와 비율이 포함된다. 재실행 전후에는 `source_row_id`와 `collected_at`을 포함한 모든 저장 컬럼의 해시도 일치했다. 따라서 비교 대상 584,385행에서 누락·중복·값 변경은 발견되지 않았다.
 
-```bash
-export PYTHONPATH=src
-python -m franchise_dw.ingest_p0_csv --input data/local/archive.zip --list-zip-members
-python -m franchise_dw.ingest_p0_csv --input data/local/archive.zip --source area --zip-member '실제 ZIP 내부 영역 CSV 경로'
-python -m franchise_dw.ingest_p0_csv --input data/local/archive.zip --source sales --zip-member '실제 ZIP 내부 매출 CSV 경로'
-python -m franchise_dw.ingest_p0_csv --input data/local/archive.zip --source store --zip-member '실제 ZIP 내부 점포 CSV 경로'
-```
+MySQL에서 원본 점포 배치의 비율을 별도 집계한 결과 개업률 >100 **5건**, 폐업률 >100 **124건**, 둘 중 하나 초과 **128건**으로 일치했다. 수집 시 원본 수치는 문자열로 보존하며 비율을 자르거나 보정하지 않았다. 28개 DIM·FACT 테이블은 검증 후에도 모두 비어 있었다.
 
-신규 비어있는 스키마에서 기대 적재 건수는 area=1,650 / sales=125,692 / store=457,043. 전체 입력을 다시 실행해 rows_inserted=0, rows_already_present가 원본 행 수와 일치하는지 확인할 것. 기존 데이터가 있다면 collection_batch_id로 필터해서 비교해야 한다.
+## 회귀 테스트와 중단 복구
 
-## 완료 조건
+- Python 단위 테스트 4개: 통과.
+- MySQL P0·P1·P2 무결성 스모크 테스트: 각각 통과. 합성 fixture는 트랜잭션 롤백으로 제거했다.
+- MySQL 합성 CSV 통합 테스트: 세 소스 각 3행의 부분 적재·재개·전체 재실행, 한글·원문·비율 보존 통과.
+- 별도 5행 합성 CSV에서 2행 배치의 두 번째 커밋 직전에 예외를 주입했다. 첫 배치 2행은 유지되고 진행 중 배치는 롤백됐으며, 재실행에서 기존 2행을 건너뛰고 나머지 3행을 삽입했다. 이는 실제 MySQL 연결을 사용한 **합성 중단 시험**이며, 원본 적재 과정에서 실제 프로세스를 강제 종료한 시험은 아니다.
 
-- [x] 실제 보관본 전체 CSV 스트리밍/매핑 dry-run.
-- [x] MySQL 8 합성 데이터 통합 테스트·재실행 검증 스크립트 작성.
-- [x] **GitHub Actions Run 40676989072 통과:** MySQL 8 실제 합성 데이터 INSERT·재실행 테스트 PASS (원본 ZIP과는 별개).
-- [ ] **실제 원본 ZIP 584,385행의 MySQL 저장 및 중복 재실행·집계 비교**.
+## 실행 중 문제와 남은 사항
 
-원본의 모든 행이 실제 MySQL에 저장되기 전에는 Phase 3-3 실적재 완료라고 주장하지 않는다.
+처음에는 Docker 엔진이 중지되어 있었고 샌드박스에서 패키지 저장소 DNS에 접근할 수 없었다. 사용자가 Docker Desktop을 시작했고, PyMySQL을 Git 제외 로컬 폴더에 설치해 해결했다. 단위 테스트의 기본 임시 디렉터리 쓰기 권한 문제는 작업 폴더의 로컬 임시 디렉터리를 지정해 해결했다. 원본 MySQL 적재 및 비교 과정에서 오류는 발생하지 않았다.
+
+원본 MySQL 적재·재실행·정합성 검증 및 회귀 시험은 완료됐다. 이번 작업에서 Phase 3-4를 실행하지 않았으며, 해당 단계로 진입할 수 있는 원본 적재 검증 근거가 확보됐다. 최종 프로젝트 완료 판정에는 요청된 Draft PR 생성 여부도 함께 확인해야 한다.
