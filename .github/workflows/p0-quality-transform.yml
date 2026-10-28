@@ -4,6 +4,7 @@ on:
     paths:
       - 'src/franchise_dw/transform_p0_quality.py'
       - 'tests/test_p0_quality_transform.py'
+      - 'tests/integration_p0_quality_mysql.py'
       - '.github/workflows/p0-quality-transform.yml'
       - 'sql/v2/migrations/005_p0_quality_staging.sql'
   push:
@@ -44,6 +45,11 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y default-mysql-client
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install MySQL integration Python dependency
+        run: python -m pip install pymysql
       - name: Create 49 existing tables then quality staging objects
         env:
           MYSQL_PWD: test_root_only
@@ -54,3 +60,12 @@ jobs:
           mysql -h 127.0.0.1 -uroot < sql/v2/p2/003_schema.sql
           mysql -h 127.0.0.1 -uroot < sql/v2/migrations/005_p0_quality_staging.sql
           test "$(mysql -h 127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='franchise_dw_p0' AND table_type='BASE TABLE'")" = "51"
+      - name: Execute synthetic quality staging against MySQL
+        env:
+          PYTHONPATH: src
+          FRANCHISE_DW_HOST: 127.0.0.1
+          FRANCHISE_DW_PORT: '3306'
+          FRANCHISE_DW_NAME: franchise_dw_p0
+          FRANCHISE_DW_USER: root
+          FRANCHISE_DW_PASSWORD: test_root_only
+        run: python tests/integration_p0_quality_mysql.py
