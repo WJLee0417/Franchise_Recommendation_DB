@@ -81,6 +81,43 @@ def check_db(kind: str, report: dict, expected_count: int, index: int = 1) -> No
 
 def main() -> None:
     with tempfile.TemporaryDirectory() as folder:
+        # Fail during a transaction after one committed batch. The actual MySQL
+        # connection rolls the second batch back, and a retry must resume it.
+        interrupted = Path(folder) / "interrupted.csv"
+        make_csv(interrupted, "area", count=5)
+
+        class FailSecondCommit:
+            def __init__(self):
+                self.conn = connect_db()
+                self.commits = 0
+
+            def cursor(self):
+                return self.conn.cursor()
+
+            def commit(self):
+                self.commits += 1
+                if self.commits == 2:
+                    raise RuntimeError("simulated interruption before commit")
+                self.conn.commit()
+
+            def rollback(self):
+                self.conn.rollback()
+
+            def close(self):
+                self.conn.close()
+
+        try:
+            ingest_csv(kind="area", input_path=interrupted, batch_size=2,
+                       connection_factory=FailSecondCommit)
+            raise AssertionError("interruption was not triggered")
+        except RuntimeError as exc:
+            assert str(exc) == "simulated interruption before commit"
+        resumed = ingest_csv(kind="area", input_path=interrupted, batch_size=2)
+        assert (resumed["rows_scanned"], resumed["rows_inserted"],
+                resumed["rows_already_present"]) == (5, 3, 2), resumed
+        check_db("area", resumed, 5, index=5)
+        print("PASS MySQL synthetic interruption: committed batch retained, active batch rolled back, retry resumed")
+
         for kind in ("area", "sales", "store"):
             path = Path(folder) / f"{kind}.csv"
             make_csv(path, kind)
