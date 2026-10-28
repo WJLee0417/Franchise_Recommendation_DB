@@ -71,6 +71,6 @@ GROUP BY source_kind, issue_codes;
 ## 테스트 및 후속 게이트
 
 - 합성 단위 테스트: 기간 정규화·금액 보존·음수/소수 거절·100 초과 유지·REVIEW 우선순위·유효기간 게이트·결과 해시 결정성.
-- GitHub Actions: 합성 단위 테스트 + 독립 MySQL 8에서 기존 49개와 새 운용 테이블 2개의 DDL 생성 확인.
+- GitHub Actions: **Run 40685469671 성공** — 합성 단위 테스트 7개 통과, MySQL 8에서 기존 49개 및 운용 테이블 2개 DDL 생성, 합성 SRC 4행을 실제 `STG_P0_QUALITY`로 변환, 네 가지 판정과 동일 배치 재실행의 해시 일치, DIM/FACT 미변경 확인. `tests/integration_p0_quality_mysql.py`.
 - 남은 작업: **실제 원본 584,385행 스테이징 변환 실행**, ACCEPT/WARN/REVIEW/REJECT 건수 검증, 교차 원천 중복·키 관계 검증, RULE-SPEC/실제 코드 일치 점검, 실행 결과의 품질 플래그 증빙 보관.
 - 원본 ZIP, 원본 DB 덤프, DB 암호는 GitHub에 업로드하지 않는다.
