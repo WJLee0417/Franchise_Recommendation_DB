@@ -54,7 +54,7 @@ P2 smoke: 6개 SRC, 5개 FACT에 synthetic row 삽입, 공개서-브랜드 JOIN,
 - [x] P2 11개 엔터티의 물리 컬럼과 주요 타입을 DAMX 문자열 덤프와 대조
 - [x] P2 신규 DDL / 6개 오류번호 구별하는 부정 테스트 작성
 - [x] GitHub Actions 49개 테이블 검증 단계 구성
-- [ ] Actions의 MySQL DDL / smoke 실제 성공 확인
+- [x] **GitHub Actions Run 40672718604 성공** (커밋 `b5a6b7cf5d2540b2f26891d8dc691c32a5335789`, MySQL 8.0.46): P0/P1/P2 DDL·smoke 모두 PASS, 실제 BASE TABLE 49개 확인
 - [ ] 실제 FTC 공시 데이터 코드북 및 기간·단위 확인
 - [ ] DIM/FACT 원천 lineage·SCD 기간 구간 겹침·분류체계 매핑 검증
 
