@@ -1,0 +1,23 @@
+name: P0 quality profiler unit tests
+on:
+  pull_request:
+    paths:
+      - 'scripts/profile_p0_quality.py'
+      - 'tests/test_p0_quality_profile.py'
+      - '.github/workflows/p0-quality-profile.yml'
+  push:
+    branches: [main, feature/phase3-4-p0-quality-profile]
+    paths:
+      - 'scripts/profile_p0_quality.py'
+      - 'tests/test_p0_quality_profile.py'
+      - '.github/workflows/p0-quality-profile.yml'
+  workflow_dispatch:
+jobs:
+  quality-profile-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests -p 'test_p0_quality_profile.py' -v
