@@ -1,0 +1,61 @@
+name: Warehouse DDL integrity (P0 + P1 + P2)
+
+on:
+  pull_request:
+    paths:
+      - "sql/v2/**"
+      - ".github/workflows/warehouse-ddl.yml"
+  push:
+    branches: [main, feature/data-warehouse-v2]
+    paths:
+      - "sql/v2/**"
+      - ".github/workflows/warehouse-ddl.yml"
+  workflow_dispatch:
+
+jobs:
+  mysql-schema-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test_root_only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptest_root_only"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MySQL CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y default-mysql-client
+      - name: P0 schema + integrity smoke
+        env:
+          MYSQL_PWD: test_root_only
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -uroot --default-character-set=utf8mb4 < sql/v2/p0/001_schema.sql
+          mysql -h 127.0.0.1 -P 3306 -uroot --default-character-set=utf8mb4 < sql/v2/p0/tests/001_integrity_smoke.sql
+      - name: P1 schema + integrity smoke
+        env:
+          MYSQL_PWD: test_root_only
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -uroot --default-character-set=utf8mb4 < sql/v2/p1/002_schema.sql
+          mysql -h 127.0.0.1 -P 3306 -uroot --default-character-set=utf8mb4 < sql/v2/p1/tests/002_integrity_smoke.sql
+      - name: P2 schema + integrity smoke
+        env:
+          MYSQL_PWD: test_root_only
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -uroot --default-character-set=utf8mb4 < sql/v2/p2/003_schema.sql
+          mysql -h 127.0.0.1 -P 3306 -uroot --default-character-set=utf8mb4 < sql/v2/p2/tests/003_integrity_smoke.sql
+      - name: Assert 49 P0+P1+P2 tables
+        env:
+          MYSQL_PWD: test_root_only
+        run: |
+          count="$(mysql -h 127.0.0.1 -P 3306 -uroot -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='franchise_dw_p0' AND table_type='BASE TABLE'")"
+          echo "table count: $count"
+          test "$count" = "49"
