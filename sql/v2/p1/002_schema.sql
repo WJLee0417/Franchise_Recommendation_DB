@@ -619,7 +619,6 @@ CREATE TABLE FACT_FRANCHISE_STORE (
   KEY ix_ffs_period (period_key),
   CONSTRAINT fk_ffs_period FOREIGN KEY (period_key) REFERENCES DIM_PERIOD(period_key) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT fk_ffs_franchise FOREIGN KEY (franchise_key) REFERENCES DIM_FRANCHISE(franchise_key) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  ,
   KEY ix_ffs_region (region_key),
   CONSTRAINT fk_ffs_region FOREIGN KEY (region_key) REFERENCES DIM_REGION(region_key) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT ck_ffs_lineage CHECK (CHAR_LENGTH(TRIM(lineage_group_id))>0)
@@ -639,7 +638,6 @@ CREATE TABLE FACT_FRANCHISE_CHANGE (
   CONSTRAINT fk_ffc_period FOREIGN KEY (period_key) REFERENCES DIM_PERIOD(period_key) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT fk_ffc_franchise FOREIGN KEY (franchise_key) REFERENCES DIM_FRANCHISE(franchise_key) ON DELETE RESTRICT ON UPDATE RESTRICT,
   ,
-  ,
   CONSTRAINT ck_ffc_lineage CHECK (CHAR_LENGTH(TRIM(lineage_group_id))>0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
@@ -656,7 +654,6 @@ CREATE TABLE FACT_FRANCHISE_AVG_SALES (
   KEY ix_ffas_period (period_key),
   CONSTRAINT fk_ffas_period FOREIGN KEY (period_key) REFERENCES DIM_PERIOD(period_key) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT fk_ffas_franchise FOREIGN KEY (franchise_key) REFERENCES DIM_FRANCHISE(franchise_key) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  ,
   KEY ix_ffas_region (region_key),
   CONSTRAINT fk_ffas_region FOREIGN KEY (region_key) REFERENCES DIM_REGION(region_key) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT ck_ffas_lineage CHECK (CHAR_LENGTH(TRIM(lineage_group_id))>0),
@@ -680,9 +677,7 @@ CREATE TABLE FACT_HQ_FINANCE (
   PRIMARY KEY (headquarter_key, period_key, accounting_scope_code),
   KEY ix_fhf_period (period_key),
   CONSTRAINT fk_fhf_period FOREIGN KEY (period_key) REFERENCES DIM_PERIOD(period_key) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  ,
   CONSTRAINT fk_fhf_hq FOREIGN KEY (headquarter_key) REFERENCES DIM_HEADQUARTER(headquarter_key) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  ,
   CONSTRAINT ck_fhf_lineage CHECK (CHAR_LENGTH(TRIM(lineage_group_id))>0),
   CONSTRAINT ck_fhf_scope CHECK (CHAR_LENGTH(TRIM(accounting_scope_code))>0),
   CONSTRAINT ck_fhf_assets CHECK (assets IS NULL OR assets>=0),
