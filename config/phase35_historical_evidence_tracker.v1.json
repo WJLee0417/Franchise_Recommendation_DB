@@ -1,0 +1,69 @@
+{
+  "revision": "2026-10-29-a",
+  "scope": "2022Q1 to 2023Q2 historical archived P0; evidence acquisition separate from FACT model contract",
+  "all_historical_gates_resolved": false,
+  "items": [
+    {
+      "gate": "G02",
+      "topic": "historic area geometry + effective periods",
+      "status": "NOT_PROVEN",
+      "sources": [
+        {
+          "url": "https://data.seoul.go.kr/dataList/OA-15560/S/1/datasetView.do",
+          "evidence": "official area dataset listing; not proof of 2022/23 version effective dates"
+        },
+        {
+          "url": "https://golmok.seoul.go.kr/source.do",
+          "evidence": "official area reference count and June 2023 reference, historical ZIP 1650 differs from official current page counts"
+        },
+        {
+          "url": "https://www.data.go.kr/data/15076394/fileData.do",
+          "evidence": "older catalog metadata, not certified polygon/effective interval"
+        }
+      ],
+      "remaining": "Download dated 2022 and 2023 official SHP/ZIP and release history, verify every area_code with shapes; prove [start,end) validity per version before DIM_AREA."
+    },
+    {
+      "gate": "G03",
+      "topic": "historical Seoul sector classification release and effective dates",
+      "status": "PARTIAL",
+      "sources": [
+        {
+          "url": "https://golmok.seoul.go.kr/images/100_v3.pdf",
+          "evidence": "official 100-sector codebook maps 100 Seoul sectors to KSIC10 names"
+        },
+        {
+          "url": "https://golmok.seoul.go.kr/introduce.do",
+          "evidence": "official classification introduction"
+        }
+      ],
+      "remaining": "Find original effective-date/release notice or classification-change history applicable to original 2022Q1..2023Q2; compare all original 100 codes/names. PDF name v3 is NOT an effective-date proof."
+    },
+    {
+      "gate": "G06",
+      "topic": "historical reporting vs observation period",
+      "status": "PARTIAL",
+      "sources": [
+        {
+          "url": "https://golmok.seoul.go.kr/source.do",
+          "evidence": "quarterly store source and snapshot basis in official current listing"
+        },
+        {
+          "url": "https://golmok.seoul.go.kr/images/seoul_info.pdf",
+          "evidence": "official store and turnover description (not historical observation date proof)"
+        },
+        {
+          "url": "https://data.seoul.go.kr/dataList/OA-15577/S/1/datasetView.do",
+          "evidence": "quarter reporting field"
+        }
+      ],
+      "remaining": "Locate dated 2022/23 store data dictionary, snapshot as-of convention, denominator/reconciliation and determine whether separate observation_period_key makes sense for quarterly source."
+    }
+  ],
+  "acquisition_log": {
+    "official_historic_shp_downloaded": false,
+    "dated_official_taxonomy_release_obtained": false,
+    "historic_store_snapshot_spec_obtained": false
+  },
+  "policy": "keep G02/G03/G06 blocked for DIM/FACT writes; never infer effective start from file modification date, 2023-06 data reference, or 2022Q1 dataset minimum"
+}
