@@ -1,7 +1,7 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "as_of": "2026-10-29",
-  "phase": "3-5-1",
+  "phase": "3-5-2",
   "scope": "P0 historical Seoul area/sales/store, 2022Q1..2023Q2, preflight ONLY; no production dimension or fact loads",
   "overall_decision": "HOLD_FACT_LOADING",
   "status_definitions": {
@@ -229,6 +229,16 @@
       "must_hold": [
         "FTC cross-provider DIM/FACT"
       ]
+    },
+    {
+      "id": "G13",
+      "subject": "historical STORE quantity column semantics and FACT metric mapping",
+      "state": "BLOCKED",
+      "required_evidence": "457043 archived rows: 유사_업종_점포_수 = 점포_수 + 프랜차이즈_점포_수 exactly; official portal total=ordinary+franchise; official historical column definitions needed",
+      "resolution": "Review FACT_AREA_STORE.store_count as total vs ordinary. Create explicit mapping (ordinary,franchise,total) with versioned source header and reconciliation; do not load until approved",
+      "must_hold": [
+        "FACT_AREA_STORE"
+      ]
     }
   ],
   "pass_conditions_for_future_loading": [
@@ -237,5 +247,11 @@
     "Preflight source integrity and target grain uniqueness pass against actual MySQL",
     "Lineage mapping and issue policy approved with deterministic retriable checks",
     "Written explicit approval for INSERT phase separate from Phase 3-5-1"
-  ]
+  ],
+  "official_source_validation": {
+    "area": "Official current AREA-상권 geospatial source exists, but no reliable historical 2022–2023 effective-start/end and polygon version proven; blocked",
+    "industry": "Official 100 생활밀접업종 classification scheme and 2022–2023 100 code/name stability verified in archive; historical effective date and official release-specific codebook version still unavailable",
+    "store_period": "Official STORE-상권 has quarterly reporting column 기준_년분기_코드; distinct observation/measurement period not substantiated. Do not assume observation_period_key equals period_key.",
+    "store_metric": "Historical CSV all 457043 rows satisfy 유사_업종_점포_수 = 점포_수 + 프랜차이즈_점포_수; likely ordinary/total/franchised respectively. Prior P0 store_count mapping is semantically ambiguous and MUST be reviewed prior to FACT load."
+  }
 }
