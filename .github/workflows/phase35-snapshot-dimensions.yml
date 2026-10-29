@@ -6,6 +6,9 @@ on:
       - 'src/franchise_dw/snapshot_dimensions.py'
       - 'src/franchise_dw/load_snapshot_dimensions.py'
       - 'tests/test_snapshot_dimensions.py'
+      - 'tests/integration_snapshot_recovery_mysql.py'
+      - 'scripts/verify_snapshot_dimensions_mysql.py'
+      - 'scripts/run_original_snapshot_validation.py'
       - '.github/workflows/phase35-snapshot-dimensions.yml'
   workflow_dispatch:
 jobs:
@@ -36,6 +39,10 @@ jobs:
           --health-retries=12
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install PyMySQL
       - run: |
           sudo apt-get update -qq
           sudo apt-get install -y default-mysql-client
@@ -46,3 +53,9 @@ jobs:
           mysql -h 127.0.0.1 -uroot < sql/v2/p0/001_schema.sql
           mysql -h 127.0.0.1 -uroot < sql/v2/migrations/007_snapshot_dimensions.sql
           test "$(mysql -h 127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='franchise_dw_p0' AND table_type='BASE TABLE' AND table_name LIKE 'SNAP\\_%'")" = "5"
+      - name: Synthetic interruption and recovery
+        env:
+          PYTHONPATH: src:scripts
+          SNAPSHOT_TEST_PASSWORD: test_root_only
+          SNAPSHOT_TEST_PORT: '3306'
+        run: python tests/integration_snapshot_recovery_mysql.py
