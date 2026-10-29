@@ -1,0 +1,48 @@
+name: Phase 3-5-4 snapshot dimensions
+on:
+  pull_request:
+    paths:
+      - 'sql/v2/migrations/007_snapshot_dimensions.sql'
+      - 'src/franchise_dw/snapshot_dimensions.py'
+      - 'src/franchise_dw/load_snapshot_dimensions.py'
+      - 'tests/test_snapshot_dimensions.py'
+      - '.github/workflows/phase35-snapshot-dimensions.yml'
+  workflow_dispatch:
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Snapshot identity and quarter tests
+        env:
+          PYTHONPATH: src
+        run: python -m unittest discover -s tests -p 'test_snapshot_dimensions.py' -v
+      - run: python -m py_compile src/franchise_dw/snapshot_dimensions.py src/franchise_dw/load_snapshot_dimensions.py
+  mysql-schema:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test_root_only
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptest_root_only"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y default-mysql-client
+      - name: Create original P0 and isolated snapshot dimensions
+        env:
+          MYSQL_PWD: test_root_only
+        run: |
+          mysql -h 127.0.0.1 -uroot < sql/v2/p0/001_schema.sql
+          mysql -h 127.0.0.1 -uroot < sql/v2/migrations/007_snapshot_dimensions.sql
+          test "$(mysql -h 127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='franchise_dw_p0' AND table_type='BASE TABLE' AND table_name LIKE 'SNAP\\_%'")" = "5"
