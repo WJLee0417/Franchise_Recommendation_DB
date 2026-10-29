@@ -1,0 +1,27 @@
+name: Phase 3-5 readiness contract tests
+on:
+  pull_request:
+    paths:
+      - 'config/phase35_load_gates.v1.json'
+      - 'scripts/preflight_p0_dim_fact.py'
+      - 'tests/test_phase35_readiness.py'
+      - '.github/workflows/phase35-readiness.yml'
+  push:
+    branches: [main, feature/phase3-5-1-dimensional-readiness]
+    paths:
+      - 'config/phase35_load_gates.v1.json'
+      - 'scripts/preflight_p0_dim_fact.py'
+      - 'tests/test_phase35_readiness.py'
+  workflow_dispatch:
+jobs:
+  validate-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Read-only readiness contract unit tests
+        run: python -m unittest discover -s tests -p 'test_phase35_readiness.py' -v
+      - name: Python syntax check
+        run: python -m py_compile scripts/preflight_p0_dim_fact.py

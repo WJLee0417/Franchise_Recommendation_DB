@@ -1,0 +1,257 @@
+{
+  "version": "0.2.0",
+  "as_of": "2026-10-29",
+  "phase": "3-5-2",
+  "scope": "P0 historical Seoul area/sales/store, 2022Q1..2023Q2, preflight ONLY; no production dimension or fact loads",
+  "overall_decision": "HOLD_FACT_LOADING",
+  "status_definitions": {
+    "READY_TO_DESIGN": "Meaning and target grain are documented; it is NOT permission to INSERT",
+    "CONDITIONAL": "Additional empirical verification required before materialization",
+    "BLOCKED": "Missing authoritative evidence or model support; INSERT forbidden"
+  },
+  "target_grains": {
+    "DIM_PERIOD": [
+      "calendar_code",
+      "period_type_code",
+      "period_code"
+    ],
+    "DIM_AREA_TYPE": [
+      "area_type_code"
+    ],
+    "DIM_DISTRICT": [
+      "district_code"
+    ],
+    "DIM_DONG": [
+      "dong_code"
+    ],
+    "DIM_AREA": [
+      "area_code",
+      "version_no"
+    ],
+    "DIM_INDUSTRY": [
+      "service_industry_code",
+      "classification_version",
+      "effective_start_date"
+    ],
+    "FACT_AREA_SALES": [
+      "period_key",
+      "area_key",
+      "industry_key"
+    ],
+    "FACT_AREA_STORE": [
+      "period_key",
+      "area_key",
+      "industry_key",
+      "observation_period_key"
+    ]
+  },
+  "source_proofs": {
+    "SRC_SEOUL_AREA": {
+      "batch": "p0-4dd5c697615606676fc0235b9c43",
+      "count": 1650,
+      "sha256": "b6281497b242d25569dcf61cc8bd05e80d300101eea5079577e42d0d280bf137",
+      "date_column": false,
+      "geometry_version_column": false
+    },
+    "SRC_SEOUL_SALES": {
+      "batch": "p0-e0c1f62afc9bd322c42e525e5345",
+      "count": 125692,
+      "sha256": "ac2ba3a8f74ec3ccbcb0ca87ba0a9cdb7b1c4cbe21d1f17331d12fa644db786d",
+      "quarter_codes": [
+        "20221",
+        "20222",
+        "20223",
+        "20224",
+        "20231",
+        "20232"
+      ],
+      "business_key": [
+        "base_year_quarter",
+        "area_code",
+        "service_industry_code"
+      ]
+    },
+    "SRC_SEOUL_STORE": {
+      "batch": "p0-271600360236b23608faf2ae6fdf",
+      "count": 457043,
+      "sha256": "8f6932112d355554a290b01ca67cd697474107fc6ad478a23b499a742cc98561",
+      "quarter_codes": [
+        "20221",
+        "20222",
+        "20223",
+        "20224",
+        "20231",
+        "20232"
+      ],
+      "business_key": [
+        "base_year_quarter",
+        "area_code",
+        "service_industry_code"
+      ]
+    }
+  },
+  "evidence": {
+    "archived_coverage": {
+      "unique_areas": 1650,
+      "sales_area_codes": 1567,
+      "store_area_codes": 1648,
+      "sales_industries": 63,
+      "store_industries": 100,
+      "sales_keys_without_store": 0,
+      "store_keys_without_sales": 331351,
+      "duplicate_source_keys_in_audited_archive": 0
+    },
+    "quality_stage": {
+      "processed": 584385,
+      "accept": 435364,
+      "warn": 123587,
+      "review": 25434,
+      "reject": 0,
+      "dim_fact_eligibility_true": 0
+    },
+    "official_urls": {
+      "seoul_area": "https://data.seoul.go.kr/dataList/OA-15560/S/1/datasetView.do",
+      "seoul_store": "https://data.seoul.go.kr/dataList/OA-15577/S/1/datasetView.do",
+      "seoul_sales": "https://data.seoul.go.kr/dataList/OA-15572/S/1/datasetView.do",
+      "seoul_introduction": "https://golmok.seoul.go.kr/introduce.do",
+      "seoul_definitions": "https://golmok.seoul.go.kr/smallRegionStatistics.do"
+    }
+  },
+  "gates": [
+    {
+      "id": "G01",
+      "subject": "DIM_PERIOD reporting-quarter records",
+      "state": "READY_TO_DESIGN",
+      "required_evidence": "Six distinct valid YYYYQ codes; Gregorian quarter ranges; determine period_end_date inclusive/exclusive convention and unit in catalog",
+      "resolution": "Generate 2022Q1..2023Q2 reference rows in future approved load, not during 3-5-1",
+      "must_hold": [
+        "nonquarter observation inference"
+      ]
+    },
+    {
+      "id": "G02",
+      "subject": "DIM_AREA area boundary version & valid-time",
+      "state": "BLOCKED",
+      "required_evidence": "Authoritative published source-area version, effective_start_date and boundaries/historical mapping for archived 2022-2023 codes; official 2024 spatial standard-unit change",
+      "resolution": "Retrieve dated 2022/2023 SHP + metadata/history; verify each CSV area_code and polygons; document [start,end) without invented dates",
+      "must_hold": [
+        "DIM_AREA",
+        "FACT_AREA_SALES",
+        "FACT_AREA_STORE"
+      ]
+    },
+    {
+      "id": "G03",
+      "subject": "DIM_INDUSTRY classification version & effective-start",
+      "state": "BLOCKED",
+      "required_evidence": "Official Seoul 100 service sector taxonomy codebook with date/version applicable 2022Q1..2023Q2; 63 sales industries subset of 100 store industries",
+      "resolution": "Acquire historical taxonomy, check 100 codes+names vs official version and SCD validity; no ad hoc version/date",
+      "must_hold": [
+        "DIM_INDUSTRY",
+        "FACT_AREA_SALES",
+        "FACT_AREA_STORE"
+      ]
+    },
+    {
+      "id": "G04",
+      "subject": "DIM_AREA_TYPE, DIM_DISTRICT and DIM_DONG codes",
+      "state": "CONDITIONAL",
+      "required_evidence": "AREA source code->name consistency against official codebook and validity at time of source; keep identifiers as strings",
+      "resolution": "Prepare read-only distinct mappings; verify authority and code revisions before writing any DIM"
+    },
+    {
+      "id": "G05",
+      "subject": "FACT_AREA_SALES grain",
+      "state": "BLOCKED",
+      "required_evidence": "125692 unique (quarter,area_code,industry_code) keys; quarterly estimated sales unit KRW; precise area+industry SCD lookup at reporting interval",
+      "resolution": "Require G02,G03 and period-date rule; check FK version covers entire quarter or formally agreed as-of rule; no duplicate natural grain",
+      "must_hold": [
+        "FACT_AREA_SALES"
+      ]
+    },
+    {
+      "id": "G06",
+      "subject": "FACT_AREA_STORE reporting vs observation period",
+      "state": "BLOCKED",
+      "required_evidence": "Quarterly source code exists but NO distinct observation period field in archived CSV; observation_period_key NOT NULL in DDL",
+      "resolution": "Obtain official store metric snapshot/observation period semantics and codebook; do not silently reuse reporting period_key",
+      "must_hold": [
+        "FACT_AREA_STORE"
+      ]
+    },
+    {
+      "id": "G07",
+      "subject": "FACT_AREA_STORE rate & count constraints",
+      "state": "CONDITIONAL",
+      "required_evidence": "Apply and confirm migration 004 in actual MySQL; preserve rates>100 (opening 5,closure 124,128 distinct rows); DECIMAL(12,6) fit; BIGINT counts nonnegative",
+      "resolution": "Check information_schema CHECK clause, don't trust P0 initial 0..100 text; add rate/amount precision QA prior to planned load"
+    },
+    {
+      "id": "G08",
+      "subject": "STORE-SALES coverage policy",
+      "state": "CONDITIONAL",
+      "required_evidence": "331351 STORE grain keys have no SALES row (not zero); SALE keys are a subset of STORE keys",
+      "resolution": "LEFT JOIN store->sales; NULL missing sales; do not synthesize 331351 sales FACTs"
+    },
+    {
+      "id": "G09",
+      "subject": "WARN/REVIEW conversion vs business metric gating",
+      "state": "CONDITIONAL",
+      "required_evidence": "Current quality STG: ACCEPT 435364, WARN 123587, REVIEW 25434; issue-level exemptions explicit; detailed 14 rules partially implemented",
+      "resolution": "Define per-target-field exception matrix; REVIEW for area missing time blocks DIM, but sales detailed time-bin issues do not imply total amount invalid"
+    },
+    {
+      "id": "G10",
+      "subject": "Lineage id and reprocessing semantics",
+      "state": "CONDITIONAL",
+      "required_evidence": "DIM/FACT lineage_group_id VARCHAR NOT NULL but no FK to SRC or STG; source batch/doc/path trace immutable",
+      "resolution": "Define lineage registry/bridge and deterministic idempotent upsert; lineage_group_id cannot be fabricated"
+    },
+    {
+      "id": "G11",
+      "subject": "SCD Type 2 temporal overlap and join cardinality",
+      "state": "BLOCKED",
+      "required_evidence": "Current-row uniqueness alone not enough; no DB range-exclusion of historical overlapping [start,end) intervals",
+      "resolution": "Test no overlap per area_code/industry_code, at most one matching SCD row per measure quarter, no boundary crossing without policy",
+      "must_hold": [
+        "DIM_AREA",
+        "DIM_INDUSTRY",
+        "FACT_AREA_SALES",
+        "FACT_AREA_STORE"
+      ]
+    },
+    {
+      "id": "G12",
+      "subject": "FTC to Seoul industry / region interoperability",
+      "state": "BLOCKED",
+      "required_evidence": "No verified category code crosswalk/FTC geographic grain; outside P0 Seoul-only validation",
+      "resolution": "Do not create FTC DIM_FRANCHISE.industry_key or cross-provider FACT joins from string similarity",
+      "must_hold": [
+        "FTC cross-provider DIM/FACT"
+      ]
+    },
+    {
+      "id": "G13",
+      "subject": "historical STORE quantity column semantics and FACT metric mapping",
+      "state": "BLOCKED",
+      "required_evidence": "457043 archived rows: 유사_업종_점포_수 = 점포_수 + 프랜차이즈_점포_수 exactly; official portal total=ordinary+franchise; official historical column definitions needed",
+      "resolution": "Review FACT_AREA_STORE.store_count as total vs ordinary. Create explicit mapping (ordinary,franchise,total) with versioned source header and reconciliation; do not load until approved",
+      "must_hold": [
+        "FACT_AREA_STORE"
+      ]
+    }
+  ],
+  "pass_conditions_for_future_loading": [
+    "Zero unresolved BLOCKED gates for proposed target table",
+    "Approved source publication/version and SCD as-of rule with audit trace",
+    "Preflight source integrity and target grain uniqueness pass against actual MySQL",
+    "Lineage mapping and issue policy approved with deterministic retriable checks",
+    "Written explicit approval for INSERT phase separate from Phase 3-5-1"
+  ],
+  "official_source_validation": {
+    "area": "Official current AREA-상권 geospatial source exists, but no reliable historical 2022–2023 effective-start/end and polygon version proven; blocked",
+    "industry": "Official 100 생활밀접업종 classification scheme and 2022–2023 100 code/name stability verified in archive; historical effective date and official release-specific codebook version still unavailable",
+    "store_period": "Official STORE-상권 has quarterly reporting column 기준_년분기_코드; distinct observation/measurement period not substantiated. Do not assume observation_period_key equals period_key.",
+    "store_metric": "Historical CSV all 457043 rows satisfy 유사_업종_점포_수 = 점포_수 + 프랜차이즈_점포_수; likely ordinary/total/franchised respectively. Prior P0 store_count mapping is semantically ambiguous and MUST be reviewed prior to FACT load."
+  }
+}

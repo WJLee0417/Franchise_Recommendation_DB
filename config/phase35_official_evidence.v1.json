@@ -1,0 +1,123 @@
+{
+  "version": "0.1.0",
+  "as_of": "2026-10-29",
+  "stage": "Phase 3-5 official evidence follow-up",
+  "decision": "PARTIALLY_VERIFIED_NO_FACT_OR_DIM_WRITE",
+  "evidence": [
+    {
+      "id": "E-STORE-FIELDS",
+      "topic": "store_metric",
+      "status": "OFFICIAL_DEFINITION_VERIFIED",
+      "source": "Seoul Open Data Plaza OA-15577 OpenAPI specification",
+      "url": "https://data.seoul.go.kr/dataList/OA-15577/A/1/datasetView.do",
+      "facts": {
+        "SIMILR_INDUTY_STOR_CO": "전체_점포_수",
+        "STOR_CO": "일반_점포_수",
+        "FRC_STOR_CO": "프랜차이즈_점포_수",
+        "identity": "전체=일반+프랜차이즈"
+      },
+      "limitations": "Old 2022-2023 CP949 columns have old Korean headings, matched using CSV field order, invariants and official API semantics; old named-release schema not obtained"
+    },
+    {
+      "id": "E-STORE-METHOD",
+      "topic": "store_observation",
+      "status": "OFFICIAL_GENERAL_METHOD_VERIFIED_HISTORICAL_SCOPE_UNVERIFIED",
+      "url": "https://golmok.seoul.go.kr/images/seoul_info.pdf",
+      "document": "서울시 상권분석서비스 제공정보, page 2 (PDF 0-based page 1)",
+      "facts": {
+        "store_definition": "당기 운영 점포수 + 폐업 점포수",
+        "turnover_rate": "(당기 개/폐업신고점포수 / 전체점포수) * 100",
+        "denominator_note": "폐업 이력 없음 또는 해당 기간 내 폐업일자가 있는 점포"
+      },
+      "limitations": "Does not give day-level historical snapshot date, 2022Q1–2023Q2 observation-period surrogate or exact historic denominator/smoothing convention"
+    },
+    {
+      "id": "E-QUARTER",
+      "topic": "store_observation",
+      "status": "OFFICIAL_QUARTER_REPORTING_VERIFIED",
+      "url": "https://golmok.seoul.go.kr/introduce.do",
+      "facts": {
+        "unit": "quarter",
+        "Q1": "Jan-Mar",
+        "Q2": "Apr-Jun",
+        "Q3": "Jul-Sep",
+        "Q4": "Oct-Dec",
+        "scheduled_release_lag": "roughly two months after quarter"
+      },
+      "limitations": "Reporting quarter and actual underlying observation dates differ; do not fill FACT_AREA_STORE.observation_period_key with report quarter without approval"
+    },
+    {
+      "id": "E-AREA-ARCHIVE",
+      "topic": "area_geometry",
+      "status": "OFFICIAL_ARCHIVED_FILE_LISTED_NOT_DOWNLOADED",
+      "url": "https://data.seoul.go.kr/dataList/OA-15560/S/1/datasetView.do",
+      "facts": {
+        "file": "서울시 상권분석서비스(영역-상권).zip",
+        "listed_file_modified": "2023-10-23",
+        "size_approx_mb": 2.07,
+        "CRS": "EPSG:5181",
+        "refresh": "ad hoc"
+      },
+      "limitations": "File bytes and actual SHP/geometry content not obtained, no 2022Q1~2023Q2 release-specific area_code->polygon->effective_start/end interval, file modification date is NOT valid-time"
+    },
+    {
+      "id": "E-AREA-OLDER",
+      "topic": "area_geometry",
+      "status": "OFFICIAL_OLDER_SNAPSHOT_REFERENCE_FOUND_NOT_DOWNLOADED",
+      "url": "https://www.data.go.kr/data/15076394/fileData.do",
+      "facts": {
+        "alternate_name": "서울특별시_우리마을가게 상권분석서비스(상권영역)_20201127",
+        "portal_created": "2021-01-21"
+      },
+      "limitations": "Older dataset catalog is 2020-11-27, not proof of 2022-2023 boundary; described as CSV not historical polygon"
+    },
+    {
+      "id": "E-AREA-SPATIAL-CHANGE",
+      "topic": "area_geometry",
+      "status": "OFFICIAL_CHANGE_NOTICE_VERIFIED",
+      "url": "https://data.seoul.go.kr/dataList/OA-15577/S/1/datasetView.do",
+      "facts": {
+        "spatial_standard_unit_change_year": 2024
+      },
+      "limitations": "Does not specify day-by-day boundary validity for 2022-2023 area codes"
+    },
+    {
+      "id": "E-INDUSTRY-BOOK",
+      "topic": "industry_classification",
+      "status": "OFFICIAL_CATEGORY_CODEBOOK_FOUND_EFFECTIVE_DATE_UNVERIFIED",
+      "url": "https://golmok.seoul.go.kr/images/100_v3.pdf",
+      "facts": {
+        "title": "100대 생활밀접업종 선정현황",
+        "uses_KSIC": "10차 세세분류명",
+        "archived_store_codes": 100,
+        "archived_sales_codes": 63,
+        "archive_cross_code_name_conflict": 0
+      },
+      "limitations": "PDF shows KSIC 10th mapping but does not establish issuance/version/effective start and end dates of Seoul 100-type classification for 2022Q1–2023Q2; file suffix v3 is not an approved temporal taxonomy ID"
+    },
+    {
+      "id": "E-ARCHIVE-COUNTS",
+      "topic": "store_metric",
+      "status": "USER_SOURCE_VERIFIED",
+      "facts": {
+        "source_sha256": "8f6932112d355554a290b01ca67cd697474107fc6ad478a23b499a742cc98561",
+        "rows": 457043,
+        "sum_identity_matches": 457043,
+        "total_0_rows": 3099,
+        "opening_rate_round_half_up_mismatches_of_nonzero_denominator": 272,
+        "closure_rate_round_half_up_mismatches_of_nonzero_denominator": 353,
+        "opening_negative_or_gt100_source_preserved": true
+      },
+      "limitations": "Reproduction of published percentage formula by dividing event count by historical CSV total count is not exact; there may be a distinct denominator, rounding or upstream calculation; do not recalculate official rates from counts"
+    }
+  ],
+  "unresolved_gates": {
+    "G02": "BLOCKED",
+    "G03": "BLOCKED",
+    "G06": "BLOCKED",
+    "G11": "BLOCKED",
+    "G13": "BLOCKED_PENDING_APPROVED_SCHEMA_MIGRATION"
+  },
+  "schema_revision": "PROPOSED_ONLY_NO_FACT_ROWS_INSERTED",
+  "official_file_bytes_downloaded": false
+}
