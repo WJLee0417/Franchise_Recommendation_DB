@@ -1,0 +1,18 @@
+name: FACT store semantics contract
+on:
+  pull_request:
+    paths:
+      - 'config/phase35_fact_store_contract.v1.json'
+      - 'sql/v2/migrations/006_fact_area_store_semantic_names.sql'
+      - 'tests/test_fact_store_semantics_contract.py'
+      - '.github/workflows/phase35-fact-store-contract.yml'
+  workflow_dispatch:
+jobs:
+  test-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests -p 'test_fact_store_semantics_contract.py' -v
