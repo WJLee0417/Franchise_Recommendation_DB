@@ -11,9 +11,9 @@ class ReadinessGateTests(TestCase):
  def test_manifest_blocks_loading(self):
   m=json.loads(MANIFEST.read_text(encoding="utf-8"))
   self.assertEqual(m["overall_decision"],"HOLD_FACT_LOADING")
-  self.assertEqual(len(m["gates"]),12)
+  self.assertEqual(len(m["gates"]),13)
   self.assertEqual(len({x["id"] for x in m["gates"]}),12)
-  self.assertEqual(sum(x["state"]=="BLOCKED" for x in m["gates"]),6)
+  self.assertEqual(sum(x["state"]=="BLOCKED" for x in m["gates"]),7)
   self.assertFalse(any(x["id"]=="G02" and x["state"]!="BLOCKED" for x in m["gates"]))
   self.assertEqual(m["evidence"]["quality_stage"]["processed"],584385)
  def test_preflight_uses_read_only_sql(self):
