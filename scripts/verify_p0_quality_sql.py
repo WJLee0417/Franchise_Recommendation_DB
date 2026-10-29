@@ -29,6 +29,12 @@ def verify(conn, kind, meta):
         tests[metric+'_source_format'] = (
             "r."+metric+" IS NULL OR TRIM(r."+metric+") NOT REGEXP '^[0-9]+([.][0-9]{1,10})?$' OR "
             "LENGTH(SUBSTRING_INDEX(TRIM(r."+metric+"),'.',1)) > 55")
+        value="JSON_EXTRACT(s.normalized_metrics, '$."+metric+"')"
+        text="JSON_UNQUOTE("+value+")"
+        tests[metric+'_stage_format'] = (
+            value+" IS NULL OR JSON_TYPE("+value+") NOT IN ('INTEGER','UNSIGNED INTEGER','STRING') OR "
+            +text+" NOT REGEXP '^[0-9]+([.][0-9]{1,10})?$' OR "
+            "LENGTH(SUBSTRING_INDEX("+text+",'.',1)) > 55")
         tests[metric] = ("NOT (CAST(JSON_UNQUOTE(JSON_EXTRACT(s.normalized_metrics, '$."
                          + metric + "')) AS DECIMAL(65,10)) <=> CAST(r." + metric
                          + " AS DECIMAL(65,10)))")

@@ -1,5 +1,6 @@
 """Actual MySQL 8 integration: staging inserts, decisions, safe rerun and no DIM/FACT writes."""
 import json
+import sys
 import tempfile
 from pathlib import Path
 from franchise_dw.ingest_p0_csv import connect_db
@@ -57,6 +58,7 @@ def main():
             assert cur.fetchone()[0]==0
     print("PASS MySQL P0 quality staging: ACCEPT/WARN/REVIEW/REJECT, replay, gating")
     test_policy_drift()
+    test_sql_rejects_invalid_staged_numbers()
 
 
 def test_policy_drift():
@@ -125,5 +127,57 @@ def test_policy_drift():
                 cur.execute("SELECT * FROM STG_P0_QUALITY WHERE source_batch_id=%s ORDER BY source_row_id",(batch,))
                 assert cur.fetchall()==before
     print("PASS MySQL policy drift: preflight rejection, mid-run rollback, recovery, unchanged replay")
+
+
+def test_sql_rejects_invalid_staged_numbers():
+    sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"scripts"))
+    from verify_p0_quality_sql import verify
+    batch="phase3-4-sql-number-synthetic"
+    with connect_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO SRC_SEOUL_AREA (collection_batch_id,source_document_id,"
+                        "source_record_path,raw_record_text,area_code,area_type_code,"
+                        "x_coordinate,y_coordinate,area_size) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                        (batch,"synthetic","sql/1","{}","00001","A","0","2","3"))
+        conn.commit()
+    run("area",batch)
+    meta={"batch_id":batch,"rows":1}
+    with connect_db() as conn:
+        assert verify(conn,"area",meta)["joined_rows"]==1
+        with conn.cursor() as cur:
+            cur.execute("SELECT normalized_metrics FROM STG_P0_QUALITY WHERE source_batch_id=%s",(batch,))
+            original=cur.fetchone()[0]
+        for statement in (
+            "JSON_SET(normalized_metrics,'$.x_coordinate',CAST('null' AS JSON))",
+            "JSON_REMOVE(normalized_metrics,'$.x_coordinate')",
+            "JSON_SET(normalized_metrics,'$.x_coordinate','not-a-number')",
+        ):
+            with conn.cursor() as cur:
+                cur.execute("UPDATE STG_P0_QUALITY SET normalized_metrics="+statement+" WHERE source_batch_id=%s",(batch,))
+            conn.commit()
+            try:
+                verify(conn,"area",meta)
+                raise AssertionError("invalid staged number passed SQL validation")
+            except AssertionError as exc:
+                assert "x_coordinate_stage_format" in str(exc),exc
+            with conn.cursor() as cur:
+                cur.execute("UPDATE STG_P0_QUALITY SET normalized_metrics=%s WHERE source_batch_id=%s",(original,batch))
+            conn.commit()
+        assert verify(conn,"area",meta)["joined_rows"]==1
+    large_batch="phase3-4-sql-unsigned-synthetic"
+    with connect_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO SRC_SEOUL_SALES (collection_batch_id,source_document_id,"
+                        "source_record_path,raw_record_text,base_year_quarter,area_code,area_type_code,"
+                        "service_industry_code,estimated_sales_amount) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                        (large_batch,"synthetic","sql/large","{}","20221","00001","A","CS100001","9223372036854775808"))
+        conn.commit()
+    run("sales",large_batch)
+    with connect_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT JSON_TYPE(JSON_EXTRACT(normalized_metrics,'$.estimated_sales_amount')) FROM STG_P0_QUALITY WHERE source_batch_id=%s",(large_batch,))
+            assert cur.fetchone()[0]=="UNSIGNED INTEGER"
+        assert verify(conn,"sales",{"batch_id":large_batch,"rows":1})["joined_rows"]==1
+    print("PASS MySQL SQL validation: null, missing and nonnumeric staged zero rejected")
 
 if __name__=="__main__":main()
