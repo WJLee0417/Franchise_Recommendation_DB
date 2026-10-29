@@ -1,0 +1,113 @@
+{
+  "contract_version": "1.0.0",
+  "status": "APPROVED_DESIGN_ONLY",
+  "database": "franchise_dw_p0",
+  "table": "FACT_AREA_STORE",
+  "grain": [
+    "period_key",
+    "area_key",
+    "industry_key",
+    "observation_period_key"
+  ],
+  "fact_load_status": "BLOCKED_UNTIL_TEMPORAL_GATES_PASS",
+  "evidence": {
+    "official_seoul_dataset": "https://data.seoul.go.kr/dataList/OA-15577/S/1/datasetView.do",
+    "official_meaning": "전체_점포_수 = 일반_점포_수 + 프랜차이즈_점포_수",
+    "historic_store_rows": 457043,
+    "historic_invariant_pass": 457043,
+    "source_archive_sha256": "8f6932112d355554a290b01ca67cd697474107fc6ad478a23b499a742cc98561",
+    "historical_korean_header_to_modern_api_field": "correspondence based on archived invariant and current official API; not a verified versioned old API schema"
+  },
+  "fields": [
+    {
+      "target": "ordinary_store_count",
+      "type": "BIGINT UNSIGNED",
+      "nullable": false,
+      "source": "SRC_SEOUL_STORE.store_count",
+      "raw_csv": "점포_수",
+      "official_field": "STOR_CO",
+      "description": "일반 점포 수"
+    },
+    {
+      "target": "total_store_count",
+      "type": "BIGINT UNSIGNED",
+      "nullable": false,
+      "source": "SRC_SEOUL_STORE.similar_industry_store_count",
+      "raw_csv": "유사_업종_점포_수",
+      "official_field": "SIMILR_INDUTY_STOR_CO",
+      "description": "전체 점포 수"
+    },
+    {
+      "target": "franchise_store_count",
+      "type": "BIGINT UNSIGNED",
+      "nullable": false,
+      "source": "SRC_SEOUL_STORE.franchise_store_count",
+      "raw_csv": "프랜차이즈_점포_수",
+      "official_field": "FRC_STOR_CO",
+      "description": "프랜차이즈 점포 수"
+    },
+    {
+      "target": "opened_store_count",
+      "type": "BIGINT UNSIGNED",
+      "nullable": true,
+      "source": "SRC_SEOUL_STORE.opened_store_count",
+      "raw_csv": "개업_점포_수",
+      "description": "원천 개업 점포 수, 기간 해석 추후 승인"
+    },
+    {
+      "target": "closed_store_count",
+      "type": "BIGINT UNSIGNED",
+      "nullable": true,
+      "source": "SRC_SEOUL_STORE.closed_store_count",
+      "raw_csv": "폐업_점포_수",
+      "description": "원천 폐업 점포 수, 기간 해석 추후 승인"
+    },
+    {
+      "target": "opening_rate",
+      "type": "DECIMAL(12,6)",
+      "nullable": true,
+      "source": "SRC_SEOUL_STORE.opening_rate",
+      "raw_csv": "개업_율",
+      "description": "원천 계산 결과 유지(100 초과 가능); 재계산 금지"
+    },
+    {
+      "target": "closure_rate",
+      "type": "DECIMAL(12,6)",
+      "nullable": true,
+      "source": "SRC_SEOUL_STORE.closure_rate",
+      "raw_csv": "폐업_률",
+      "description": "원천 계산 결과 유지(100 초과 가능); 재계산 금지"
+    }
+  ],
+  "constraints": [
+    "total_store_count = ordinary_store_count + franchise_store_count (no nulls)",
+    "counts nonnegative via UNSIGNED",
+    "opening_rate and closure_rate nonnegative via 004_store_rate_nonnegative.sql",
+    "FACT grain and FKs unchanged",
+    "observation_period_key NOT NULL; NEVER default from period_key without temporal evidence"
+  ],
+  "safe_migration": {
+    "script": "sql/v2/migrations/006_fact_area_store_semantic_names.sql",
+    "preconditions": [
+      "FACT_AREA_STORE is empty",
+      "004_store_rate_nonnegative.sql applied",
+      "MySQL >= 8.0.16",
+      "backup and migration review if existing data"
+    ],
+    "migration_scope": "only rename two columns and tighten nullability of total/franchise counts, add check",
+    "does_not_write": [
+      "SRC_*",
+      "STG_P0_QUALITY",
+      "DIM_*",
+      "FACT_AREA_STORE rows"
+    ]
+  },
+  "quality_policy": "P0 v0.1 existing STG hashes/decisions are immutable; P0 v0.2 is a separate future versioned quality run, not part of this schema proposal",
+  "disallow": [
+    "mapping former SRC.store_count into total_store_count",
+    "old 'similar_industry' label in new FACT",
+    "using unverified dates/version IDs",
+    "setting missing sales to zero",
+    "overwriting original rates"
+  ]
+}
