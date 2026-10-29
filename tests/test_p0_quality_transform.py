@@ -1,5 +1,10 @@
+import json
+import tempfile
 import unittest
-from franchise_dw.transform_p0_quality import evaluate, decimal_value
+from pathlib import Path
+from unittest.mock import Mock
+from franchise_dw.transform_p0_quality import (POLICY_PATH, evaluate, decimal_value,
+                                                load_policy, run)
 
 BASE={"source_row_id":1,"collection_batch_id":"b","source_document_id":"d",
       "source_record_path":"csv-record/2","area_code":"0311001",
@@ -54,5 +59,38 @@ class P0QualityTests(unittest.TestCase):
                      franchise_store_count="0")
         self.assertEqual(evaluate("store",row)["result_sha256"],
                          evaluate("store",row)["result_sha256"])
+
+    def test_policy_changes_fail_before_database_connection(self):
+        original=json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/"policy.json"
+            path.write_text(json.dumps(original,ensure_ascii=False,indent=4),encoding="utf-8")
+            self.assertEqual(load_policy(path),load_policy())
+            for change in ("condition", "version", "missing_version"):
+                policy=json.loads(json.dumps(original))
+                if change=="condition": policy["rules"][0]["condition"]="changed"
+                elif change=="version": policy["version"]="0.1.1"
+                else: del policy["version"]
+                path.write_text(json.dumps(policy,ensure_ascii=False),encoding="utf-8")
+                connection=Mock()
+                with self.assertRaisesRegex(RuntimeError,"policy validation failed"):
+                    run("area","batch",connection_factory=connection,policy_path=path)
+                connection.assert_not_called()
+
+    def test_invalid_missing_or_duplicate_policy_rejected(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/"policy.json"
+            for contents in ('{', '{"version":"0.1.0","version":"0.1.0"}',
+                             '{"version":"0.1.0","value":NaN}'):
+                path.write_text(contents,encoding="utf-8")
+                with self.assertRaisesRegex(RuntimeError,"policy validation failed"):
+                    load_policy(path)
+            path.unlink()
+            with self.assertRaisesRegex(RuntimeError,"policy validation failed"):
+                load_policy(path)
+
+    def test_evaluate_rejects_unapproved_policy(self):
+        with self.assertRaisesRegex(RuntimeError,"Unapproved"):
+            evaluate("sales",test_row(estimated_sales_amount="1"),policy=("0.1.0","other"))
 
 if __name__=="__main__":unittest.main()

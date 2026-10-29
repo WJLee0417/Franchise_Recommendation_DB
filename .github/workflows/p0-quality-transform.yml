@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - 'src/franchise_dw/transform_p0_quality.py'
+      - 'config/p0_quality_rules.v1.json'
+      - 'scripts/verify_p0_quality_mysql.py'
+      - 'tests/test_p0_quality_mysql_verifier.py'
       - 'tests/test_p0_quality_transform.py'
       - 'tests/integration_p0_quality_mysql.py'
       - '.github/workflows/p0-quality-transform.yml'
@@ -11,6 +14,9 @@ on:
     branches: [main, feature/phase3-4-p0-quality-profile]
     paths:
       - 'src/franchise_dw/transform_p0_quality.py'
+      - 'config/p0_quality_rules.v1.json'
+      - 'scripts/verify_p0_quality_mysql.py'
+      - 'tests/test_p0_quality_mysql_verifier.py'
       - 'tests/test_p0_quality_transform.py'
       - '.github/workflows/p0-quality-transform.yml'
   workflow_dispatch:
@@ -26,6 +32,10 @@ jobs:
         env:
           PYTHONPATH: src
         run: python -m unittest discover -s tests -p 'test_p0_quality_transform.py' -v
+      - name: Execute MySQL verifier unit tests
+        env:
+          PYTHONPATH: .:src
+        run: python -m unittest discover -s tests -p 'test_p0_quality_mysql_verifier.py' -v
   schema:
     runs-on: ubuntu-latest
     services:

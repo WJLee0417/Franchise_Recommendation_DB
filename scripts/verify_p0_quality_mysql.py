@@ -9,11 +9,10 @@ import hashlib
 import json
 import time
 from collections import Counter
-from datetime import datetime
 from pathlib import Path
 
 from franchise_dw.ingest_p0_csv import connect_db
-from franchise_dw.transform_p0_quality import TABLES, evaluate, run
+from franchise_dw.transform_p0_quality import TABLES, evaluate, load_policy, run
 
 ORIGINAL = {
     "area": {"batch_id": "p0-4dd5c697615606676fc0235b9c43", "rows": 1650,
@@ -46,16 +45,23 @@ def count_analytic_rows(conn):
 def stage_fingerprint(conn,kind,batch):
     sha=hashlib.sha256()
     with conn.cursor() as c:
-        c.execute("SELECT source_row_id,result_sha256,written_at "
-                  "FROM STG_P0_QUALITY WHERE source_kind=%s AND source_batch_id=%s "
-                  "ORDER BY source_row_id",(kind,batch))
-        while chunk:=c.fetchmany(3000):
-            for rowid,result_sha,ts in chunk:
-                sha.update(f"{rowid}:{result_sha}:{ts.isoformat() if isinstance(ts,datetime) else ts}\n".encode())
+        last_id=0
+        while True:
+            c.execute("SELECT * FROM STG_P0_QUALITY WHERE source_kind=%s AND source_batch_id=%s "
+                      "AND source_row_id>%s ORDER BY source_row_id LIMIT 3000",(kind,batch,last_id))
+            columns=[col[0] for col in c.description]
+            chunk=c.fetchall()
+            if not chunk: break
+            for row in chunk:
+                stored=dict(zip(columns,row))
+                last_id=stored["source_row_id"]
+                sha.update((json.dumps(stored,ensure_ascii=False,sort_keys=True,
+                                       separators=(",",":"),default=str)+"\n").encode("utf-8"))
     return sha.hexdigest()
 
 
 def verify_one(conn,kind,config,chunk_size):
+    policy=load_policy()
     table=TABLES[kind]
     batch=config["batch_id"]
     source_hash=config["source_hash"]
@@ -101,7 +107,7 @@ def verify_one(conn,kind,config,chunk_size):
                 rid=raw["source_row_id"]
                 if raw["source_document_id"]!="sha256:"+source_hash:
                     raise AssertionError(f"{kind}: incorrect original source hash in row {rid}")
-                predicted=evaluate(kind,raw)
+                predicted=evaluate(kind,raw,policy=policy)
                 observed=staged_by_id[rid]
                 for key in ("source_batch_id","source_document_id","source_record_path",
                             "source_raw_sha256","rule_version","decision",
@@ -139,6 +145,7 @@ def main():
         parser.error("chunk-size must be 1..2000")
     result={"type":"REAL_MYSQL_SOURCE_TO_STAGING","verify_only":args.verify_only,
             "all_checks_pass":False,"sources":{}}
+    load_policy()
     conn=connect_db()
     try:
         before=count_analytic_rows(conn)

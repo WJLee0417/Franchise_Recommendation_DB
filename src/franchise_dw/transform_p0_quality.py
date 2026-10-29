@@ -6,6 +6,7 @@ import re
 import uuid
 from collections import Counter
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from franchise_dw.ingest_p0_csv import connect_db
 
 TABLES = {"area":"SRC_SEOUL_AREA","sales":"SRC_SEOUL_SALES","store":"SRC_SEOUL_STORE"}
@@ -18,6 +19,39 @@ METRICS = {"area":["x_coordinate","y_coordinate","area_size"],
 LEVEL = {"ACCEPT":0,"WARN":1,"REVIEW":2,"REJECT":3}
 MISSING = {"","NULL","N/A","NA","NONE","-","미상","정보없음"}
 PERIOD = re.compile(r"^(19|20)[0-9]{2}[1-4]$")
+POLICY_PATH = Path(__file__).resolve().parents[2] / "config" / "p0_quality_rules.v1.json"
+# This fingerprint identifies the policy reviewed alongside this implementation.
+# A changed policy must be reviewed and implemented before this pin is updated.
+APPROVED_POLICY_VERSION = "0.1.0"
+APPROVED_POLICY_SHA256 = "c517e44c856fe0ca99b563fff3fb54a58dffb10fdbf380e08384be529f6fd15c"
+
+
+def load_policy(path=None):
+    """Reject policy drift before writing; JSON formatting and key order are immaterial."""
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"Duplicate policy JSON key: {key}")
+            result[key] = value
+        return result
+
+    def invalid_constant(value):
+        raise ValueError(f"Invalid policy JSON constant: {value}")
+
+    try:
+        data = json.loads(Path(path or POLICY_PATH).read_text(encoding="utf-8"),
+                          object_pairs_hook=unique_object, parse_constant=invalid_constant)
+        if not isinstance(data, dict) or data.get("version") != APPROVED_POLICY_VERSION:
+            raise ValueError("Unsupported policy version")
+        canonical = json.dumps(data, ensure_ascii=False, sort_keys=True,
+                               separators=(",", ":"), allow_nan=False).encode("utf-8")
+        digest = hashlib.sha256(canonical).hexdigest()
+        if digest != APPROVED_POLICY_SHA256:
+            raise ValueError("Policy JSON differs from the approved implementation")
+    except (OSError, UnicodeError, ValueError, TypeError, RecursionError) as exc:
+        raise RuntimeError(f"P0 quality policy validation failed: {exc}") from exc
+    return APPROVED_POLICY_VERSION, digest
 
 def decimal_value(value, *, integer=False, allow_negative=False):
     if value is None or str(value).strip().upper() in MISSING:
@@ -30,9 +64,12 @@ def decimal_value(value, *, integer=False, allow_negative=False):
         raise ValueError("FRACTIONAL")
     return int(n) if integer else format(n,"f")
 
-def evaluate(kind, row):
+def evaluate(kind, row, *, policy=None):
     """Return deterministic decision + flags + original-to-typed mapping."""
     if kind not in TABLES: raise ValueError("Unsupported SRC table")
+    if policy is None: policy=load_policy()
+    if policy != (APPROVED_POLICY_VERSION, APPROVED_POLICY_SHA256):
+        raise RuntimeError("Unapproved P0 quality policy")
     issues=[]
     def add(code,level): issues.append((code,level))
     area=(row.get("area_code") or "").strip()
@@ -100,7 +137,7 @@ def evaluate(kind, row):
         "source_document_id":row["source_document_id"],
         "source_record_path":row["source_record_path"],
         "source_raw_sha256":hashlib.sha256(row["raw_record_text"].encode("utf-8")).hexdigest(),
-        "rule_version":"0.1.0","decision":decision,"issue_codes":[k for k,_ in issues],
+        "rule_version":policy[0],"decision":decision,"issue_codes":[k for k,_ in issues],
         "normalized_period_code":period,"area_code":area or None,
         "industry_code":industry,"area_type_code":typ or None,
         "normalized_metrics":metrics,"dim_area_eligible":0,"fact_eligible":0
@@ -109,9 +146,10 @@ def evaluate(kind, row):
     clean["result_sha256"]=hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
     return clean
 
-def run(kind,batch_id,chunk=500,connection_factory=connect_db):
+def run(kind,batch_id,chunk=500,connection_factory=connect_db, *, policy_path=None):
     if kind not in TABLES: raise ValueError("Unapproved source")
     if not batch_id or len(batch_id)>50 or chunk<1 or chunk>5000: raise ValueError("Invalid arguments")
+    policy=load_policy(policy_path)
     conn=connection_factory(); run_id=str(uuid.uuid4()); counts=Counter()
     fields=["source_kind","source_row_id","source_batch_id","source_document_id",
             "source_record_path","source_raw_sha256","rule_version","decision",
@@ -124,7 +162,7 @@ def run(kind,batch_id,chunk=500,connection_factory=connect_db):
     try:
         with conn.cursor() as cur:
             cur.execute("INSERT INTO DQ_P0_RUN(run_id,source_kind,source_batch_id,policy_version,status) VALUES (%s,%s,%s,%s,'RUNNING')",
-                        (run_id,kind,batch_id,"0.1.0"))
+                        (run_id,kind,batch_id,policy[0]))
         conn.commit()
         last=0
         while True:
@@ -135,7 +173,7 @@ def run(kind,batch_id,chunk=500,connection_factory=connect_db):
                 if not raw_rows: break
                 for record in raw_rows:
                     source=dict(zip(columns,record));last=source["source_row_id"]
-                    normalized=evaluate(kind,source)
+                    normalized=evaluate(kind,source,policy=policy)
                     counts[normalized["decision"]]+=1
                     cur.execute("SELECT result_sha256 FROM STG_P0_QUALITY WHERE source_kind=%s AND source_row_id=%s",(kind,last))
                     prev=cur.fetchone()
@@ -144,8 +182,12 @@ def run(kind,batch_id,chunk=500,connection_factory=connect_db):
                             raise RuntimeError("Existing staging content differs; manual versioned migration needed")
                     else:
                         cur.execute(insert,bind(normalized))
+            if load_policy(policy_path)!=policy:
+                raise RuntimeError("P0 quality policy changed during execution")
             conn.commit()
         n=sum(counts.values())
+        if load_policy(policy_path)!=policy:
+            raise RuntimeError("P0 quality policy changed during execution")
         with conn.cursor() as cur:
             cur.execute("UPDATE DQ_P0_RUN SET status='SUCCEEDED', processed_rows=%s, accept_rows=%s, warn_rows=%s, review_rows=%s, reject_rows=%s, finished_at=NOW(6) WHERE run_id=%s",
                 (n,counts["ACCEPT"],counts["WARN"],counts["REVIEW"],counts["REJECT"],run_id))
@@ -165,7 +207,8 @@ def main():
     parser.add_argument("--source",required=True,choices=sorted(TABLES))
     parser.add_argument("--batch-id",required=True)
     parser.add_argument("--chunk-size",type=int,default=500)
+    parser.add_argument("--policy-file",type=Path,default=None)
     args=parser.parse_args()
-    print(json.dumps(run(args.source,args.batch_id,args.chunk_size),ensure_ascii=False))
+    print(json.dumps(run(args.source,args.batch_id,args.chunk_size,policy_path=args.policy_file),ensure_ascii=False))
 
 if __name__=="__main__": main()

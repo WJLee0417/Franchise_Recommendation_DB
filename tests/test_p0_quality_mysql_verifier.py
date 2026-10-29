@@ -60,6 +60,22 @@ class VerifierTests(unittest.TestCase):
     def test_verify_only_initializes_source_report(self):
         self.assertEqual(self.exercise(True), ['fingerprint', 'verify', 'fingerprint'])
 
+    def test_fingerprint_covers_stored_content_not_only_result_hash(self):
+        class RowCursor:
+            description=[('source_row_id',),('decision',),('result_sha256',),('written_at',)]
+            def __init__(self, decision): self.decision=decision
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def execute(self, query, params): self.last=params[-1]
+            def fetchall(self):
+                return [(1,self.decision,'same-hash','same-time')] if self.last==0 else []
+        class RowConnection:
+            def __init__(self, decision): self.decision=decision
+            def cursor(self): return RowCursor(self.decision)
+        before=verifier.stage_fingerprint(RowConnection('ACCEPT'),'area','batch')
+        after=verifier.stage_fingerprint(RowConnection('REVIEW'),'area','batch')
+        self.assertNotEqual(before,after)
+
 
 if __name__ == '__main__':
     unittest.main()
