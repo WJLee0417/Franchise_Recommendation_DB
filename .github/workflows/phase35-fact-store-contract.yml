@@ -1,0 +1,53 @@
+name: FACT store semantics contract
+on:
+  pull_request:
+    paths:
+      - 'config/phase35_fact_store_contract.v1.json'
+      - 'sql/v2/migrations/006_fact_area_store_semantic_names.sql'
+      - 'tests/test_fact_store_semantics_contract.py'
+      - 'tests/integration_fact_store_migration.sql'
+      - '.github/workflows/phase35-fact-store-contract.yml'
+  workflow_dispatch:
+jobs:
+  test-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests -p 'test_fact_store_semantics_contract.py' -v
+  mysql-migration:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test_root_only
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptest_root_only"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MySQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y default-mysql-client
+      - name: Apply P0, nonnegative rates and guarded 006
+        env:
+          MYSQL_PWD: test_root_only
+        run: |
+          mysql -h 127.0.0.1 -uroot < sql/v2/p0/001_schema.sql
+          mysql -h 127.0.0.1 -uroot < sql/v2/migrations/004_store_rate_nonnegative.sql
+          mysql -h 127.0.0.1 -uroot < sql/v2/migrations/006_fact_area_store_semantic_names.sql
+          mysql -h 127.0.0.1 -uroot < tests/integration_fact_store_migration.sql
+      - name: Reject replay
+        env:
+          MYSQL_PWD: test_root_only
+        run: |
+          if mysql -h 127.0.0.1 -uroot < sql/v2/migrations/006_fact_area_store_semantic_names.sql; then
+            echo "ERROR: 006 replay unexpectedly succeeded"; exit 1
+          fi
