@@ -1,0 +1,100 @@
+{
+  "version": "0.1.0-proposal",
+  "status": "EVIDENCE_REVIEW_ONLY_NO_DATA_WRITE",
+  "as_of": "2026-10-29",
+  "original_periods": "2022Q1–2023Q2",
+  "scope": "Original SRC_SEOUL_STORE 457043 rows; classification/version policy migration requires separate approval",
+  "verified": {
+    "source_file_sha256": "8f6932112d355554a290b01ca67cd697474107fc6ad478a23b499a742cc98561",
+    "source_rows": 457043,
+    "exact_identity_rows": 457043,
+    "identity_failures": 0,
+    "identity": "유사_업종_점포_수 = 점포_수 + 프랜차이즈_점포_수",
+    "official_current_api": "https://data.seoul.go.kr/dataList/OA-15577/S/1/datasetView.do",
+    "official_formula": "전체_점포_수 = 일반_점포_수 + 프랜차이즈_점포_수",
+    "official_fields": {
+      "SIMILR_INDUTY_STOR_CO": "전체_점포_수",
+      "STOR_CO": "일반_점포_수",
+      "FRC_STOR_CO": "프랜차이즈_점포_수"
+    },
+    "historical_mapping_confidence": "HIGH based on matching original dataset field order, API English field codes and 457043-row invariant, but old CSV officially published Korean labels differ"
+  },
+  "source_to_semantic": {
+    "SRC_SEOUL_STORE.store_count": {
+      "original_column": "점포_수",
+      "interpreted_metric": "ordinary_store_count",
+      "api_field": "STOR_CO",
+      "confidence": "HIGH"
+    },
+    "SRC_SEOUL_STORE.similar_industry_store_count": {
+      "original_column": "유사_업종_점포_수",
+      "interpreted_metric": "total_store_count",
+      "api_field": "SIMILR_INDUTY_STOR_CO",
+      "confidence": "HIGH"
+    },
+    "SRC_SEOUL_STORE.franchise_store_count": {
+      "original_column": "프랜차이즈_점포_수",
+      "interpreted_metric": "franchise_store_count",
+      "api_field": "FRC_STOR_CO",
+      "confidence": "HIGH"
+    }
+  },
+  "candidate_fact_mapping": {
+    "FACT_AREA_STORE.store_count": {
+      "source_field": "SRC_SEOUL_STORE.similar_industry_store_count",
+      "semantic": "total_store_count",
+      "approval": "BLOCKED_UNTIL_FACT_CONTRACT_APPROVAL"
+    },
+    "FACT_AREA_STORE.similar_industry_store_count": {
+      "source_field": "SRC_SEOUL_STORE.store_count",
+      "semantic": "ordinary_store_count",
+      "approval": "BLOCKED_REQUIRE_RENAME_OR_EXPLICIT_METADATA"
+    },
+    "FACT_AREA_STORE.franchise_store_count": {
+      "source_field": "SRC_SEOUL_STORE.franchise_store_count",
+      "semantic": "franchise_store_count",
+      "approval": "CONDITIONAL_AFTER_G02_G03_G06_G11"
+    }
+  },
+  "quality_policy_revision": {
+    "supersedes_existing_stg": false,
+    "proposed_version": "0.2.0",
+    "reason": "Existing rule 004 treats total>ordinary as anomaly, rule 005 treats franchised>ordinary as anomaly, and rule 006 compares event counts to ordinary rather than total.",
+    "suppress_rule_codes": [
+      "P0-DQ-004_SIMILAR_GT_STORE",
+      "P0-DQ-005_FRANCHISE_GT_STORE"
+    ],
+    "change_rule006_denominator": "Use total_store_count rather than ordinary_store_count for zero-store/event count comparison (not final indicator denominator approval).",
+    "preserve": [
+      "P0-DQ-003_OPEN_GT_100",
+      "P0-DQ-003_CLOSE_GT_100",
+      "P0-DQ-006_OPEN_ZERO_WITH_EVENTS",
+      "P0-DQ-006_CLOSE_ZERO_WITH_EVENTS"
+    ],
+    "original_store_decisions": {
+      "ACCEPT": 383390,
+      "WARN": 49873,
+      "REVIEW": 23780,
+      "REJECT": 0
+    },
+    "simulated_store_decisions_not_applied": {
+      "ACCEPT": 453607,
+      "WARN": 0,
+      "REVIEW": 3436,
+      "REJECT": 0
+    },
+    "changed_v0_1_to_v0_2_simulated": 70217
+  },
+  "mandatory_hold": [
+    "G02 historical area effective dates and polygon boundaries",
+    "G03 official 100-classification effective period",
+    "G06 exact 2022–2023 store observation-period definition",
+    "G11 SCD overlap and quarter matching",
+    "G13 fact column names and metric semantics"
+  ],
+  "source_references": [
+    "https://data.seoul.go.kr/dataList/OA-15577/S/1/datasetView.do",
+    "https://golmok.seoul.go.kr/images/seoul_info.pdf",
+    "https://golmok.seoul.go.kr/images/100_v3.pdf"
+  ]
+}
