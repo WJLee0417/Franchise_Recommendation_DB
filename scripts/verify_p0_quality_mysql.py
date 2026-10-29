@@ -7,6 +7,7 @@ Run: PYTHONPATH=src python scripts/verify_p0_quality_mysql.py --report data/loca
 import argparse
 import hashlib
 import json
+import time
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -142,20 +143,35 @@ def main():
     try:
         before=count_analytic_rows(conn)
         for kind,meta in ORIGINAL.items():
+            result["sources"][kind]={}
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) FROM STG_P0_QUALITY WHERE source_kind=%s AND source_batch_id=%s", (kind,meta["batch_id"]))
+                staged_before=cursor.fetchone()[0]
             fingerprint_before=stage_fingerprint(conn,kind,meta["batch_id"])
             if not args.verify_only:
+                started=time.monotonic()
                 first=run(kind,meta["batch_id"],args.chunk_size)
-                result["sources"][kind]={"run":first}
+                first_seconds=time.monotonic()-started
+                # MySQL's default REPEATABLE READ otherwise retains the snapshot
+                # opened by count_analytic_rows/stage_fingerprint before run().
+                conn.commit()
+                result["sources"][kind].update({"run":first,"first_run_seconds":round(first_seconds,3),"staging_rows_before":staged_before})
             details=verify_one(conn,kind,meta,args.chunk_size)
             fingerprint_loaded=stage_fingerprint(conn,kind,meta["batch_id"])
             if not args.verify_only:
+                started=time.monotonic()
                 replay=run(kind,meta["batch_id"],args.chunk_size)
+                replay_seconds=time.monotonic()-started
+                # Observe replay commits, rather than comparing a stale snapshot.
+                conn.commit()
                 fingerprint_replay=stage_fingerprint(conn,kind,meta["batch_id"])
                 if fingerprint_replay!=fingerprint_loaded:
                     raise AssertionError(f"{kind}: re-run modified stored result/timestamp")
                 if replay["processed"]!=meta["rows"]:
                     raise AssertionError(f"{kind}: replay count drift")
                 result["sources"][kind]["replay"]=replay
+                result["sources"][kind]["replay_seconds"]=round(replay_seconds,3)
+                result["sources"][kind]["staging_first_run_net_new_rows"]=details["staged_rows"]-staged_before
                 result["sources"][kind]["staging_second_run_new_or_modified_rows"]=0
             result["sources"][kind]["validation"]={**details,
                 "staging_fingerprint_sha256":fingerprint_loaded}
