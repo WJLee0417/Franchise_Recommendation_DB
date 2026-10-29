@@ -12,7 +12,7 @@ class ReadinessGateTests(TestCase):
   m=json.loads(MANIFEST.read_text(encoding="utf-8"))
   self.assertEqual(m["overall_decision"],"HOLD_FACT_LOADING")
   self.assertEqual(len(m["gates"]),13)
-  self.assertEqual(len({x["id"] for x in m["gates"]}),12)
+  self.assertEqual(len({x["id"] for x in m["gates"]}),13)
   self.assertEqual(sum(x["state"]=="BLOCKED" for x in m["gates"]),7)
   self.assertFalse(any(x["id"]=="G02" and x["state"]!="BLOCKED" for x in m["gates"]))
   self.assertEqual(m["evidence"]["quality_stage"]["processed"],584385)
