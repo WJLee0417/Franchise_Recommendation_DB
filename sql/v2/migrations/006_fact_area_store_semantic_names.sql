@@ -38,9 +38,8 @@ BEGIN
       SET MESSAGE_TEXT = '006 refused: nonnegative-only rate checks (004) not found';
   END IF;
   ALTER TABLE FACT_AREA_STORE
-    RENAME COLUMN store_count TO ordinary_store_count,
-    RENAME COLUMN similar_industry_store_count TO total_store_count,
-    MODIFY COLUMN total_store_count BIGINT UNSIGNED NOT NULL,
+    CHANGE COLUMN store_count ordinary_store_count BIGINT UNSIGNED NOT NULL,
+    CHANGE COLUMN similar_industry_store_count total_store_count BIGINT UNSIGNED NOT NULL,
     MODIFY COLUMN franchise_store_count BIGINT UNSIGNED NOT NULL,
     ADD CONSTRAINT ck_fast_total_decomposition
       CHECK (total_store_count = ordinary_store_count + franchise_store_count);
