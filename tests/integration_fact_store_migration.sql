@@ -38,8 +38,8 @@ BEGIN
  DECLARE rejected BOOLEAN DEFAULT FALSE;
  BEGIN
    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET rejected=TRUE;
-   INSERT INTO FACT_AREA_STORE(period_key,area_key,industry_key,observation_period_key,ordinary_store_count,total_store_count,franchise_store_count,lineage_group_id)
-   VALUES(1,1,1,1,3,9,2,'ci');
+   UPDATE FACT_AREA_STORE SET total_store_count=9
+   WHERE period_key=1 AND area_key=1 AND industry_key=1 AND observation_period_key=1;
  END;
  IF rejected=FALSE THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='bad sum unexpectedly inserted'; END IF;
 END//
